@@ -1,0 +1,252 @@
+import uuid
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.dependencies import get_db
+from app.models.message import Message
+from app.models.lead import Lead
+from app.models.activity import Activity
+from app.schemas.message import MessageResponse, SendMessageRequest, GenerateMessageRequest
+from app.schemas.common import PaginatedResponse
+from app.services.ai_engine import ai_engine
+from app.services.email_service import gmail_service
+from app.core.rate_limiter import rate_limiter
+
+router = APIRouter()
+
+
+@router.get("", response_model=PaginatedResponse[MessageResponse])
+async def list_messages(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    lead_id: uuid.UUID | None = None,
+    channel: str | None = None,
+    direction: str | None = None,
+    status: str | None = None,
+    classification: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Message)
+    count_query = select(func.count()).select_from(Message)
+
+    if lead_id:
+        query = query.where(Message.lead_id == lead_id)
+        count_query = count_query.where(Message.lead_id == lead_id)
+    if channel:
+        query = query.where(Message.channel == channel)
+        count_query = count_query.where(Message.channel == channel)
+    if direction:
+        query = query.where(Message.direction == direction)
+        count_query = count_query.where(Message.direction == direction)
+    if status:
+        query = query.where(Message.status == status)
+        count_query = count_query.where(Message.status == status)
+    if classification:
+        query = query.where(Message.classification == classification)
+        count_query = count_query.where(Message.classification == classification)
+
+    total = (await db.execute(count_query)).scalar() or 0
+    offset = (page - 1) * per_page
+    query = query.order_by(Message.created_at.desc()).offset(offset).limit(per_page)
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    return PaginatedResponse(
+        items=[MessageResponse.model_validate(m) for m in items],
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=(total + per_page - 1) // per_page,
+    )
+
+
+@router.get("/pending-replies")
+async def pending_replies(db: AsyncSession = Depends(get_db)):
+    """Get inbound messages that need human attention."""
+    result = await db.execute(
+        select(Message)
+        .where(
+            Message.direction == "inbound",
+            Message.classification.in_(["interested", "meeting_request", "requesting_info"]),
+        )
+        .order_by(Message.created_at.desc())
+        .limit(50)
+    )
+    items = result.scalars().all()
+    return [MessageResponse.model_validate(m) for m in items]
+
+
+@router.post("/send", response_model=MessageResponse, status_code=201)
+async def send_message(data: SendMessageRequest, db: AsyncSession = Depends(get_db)):
+    """Manually send a message to a lead."""
+    # Verify lead
+    lead_result = await db.execute(
+        select(Lead).options(selectinload(Lead.company)).where(Lead.id == data.lead_id)
+    )
+    lead = lead_result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    if lead.do_not_contact:
+        raise HTTPException(status_code=400, detail="Lead is marked do-not-contact")
+
+    if data.channel == "email":
+        if not lead.email:
+            raise HTTPException(status_code=400, detail="Lead has no email address")
+
+        # Check rate limit
+        can_send = await rate_limiter.can_send("email")
+        if not can_send:
+            raise HTTPException(status_code=429, detail="Email daily limit reached")
+
+        # Send via Gmail
+        result = await gmail_service.send_email(
+            to=lead.email,
+            subject=data.subject or "The Apex Human Company",
+            body=data.body,
+        )
+
+        await rate_limiter.record_send("email")
+
+        message = Message(
+            lead_id=lead.id,
+            channel="email",
+            direction="outbound",
+            subject=data.subject,
+            body=data.body,
+            status="sent",
+            sent_at=datetime.now(timezone.utc),
+            external_id=result.get("message_id"),
+        )
+    else:
+        # Non-email channels: queue for Phase 3
+        message = Message(
+            lead_id=lead.id,
+            channel=data.channel,
+            direction="outbound",
+            subject=data.subject,
+            body=data.body,
+            status="queued",
+            scheduled_at=data.schedule_at,
+        )
+
+    db.add(message)
+
+    # Log activity
+    activity = Activity(
+        lead_id=lead.id,
+        type=f"{data.channel}_sent",
+        channel=data.channel,
+        description=f"Message sent via {data.channel}: {(data.subject or data.body[:50])}",
+    )
+    db.add(activity)
+
+    await db.commit()
+    await db.refresh(message)
+    return MessageResponse.model_validate(message)
+
+
+@router.post("/generate")
+async def generate_message(data: GenerateMessageRequest, db: AsyncSession = Depends(get_db)):
+    """Generate a personalized message using Claude AI."""
+    lead_result = await db.execute(
+        select(Lead).options(selectinload(Lead.company)).where(Lead.id == data.lead_id)
+    )
+    lead = lead_result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    company_name = lead.company.name if lead.company else "their company"
+    industry = lead.company.industry if lead.company else "Other"
+
+    result = await ai_engine.generate_outreach_message(
+        lead_name=lead.full_name,
+        lead_title=lead.job_title,
+        lead_company=company_name,
+        lead_industry=industry,
+        channel=data.channel,
+        message_type=data.message_type,
+        context=data.context,
+        custom_instructions=data.custom_instructions,
+    )
+
+    return {
+        "subject": result.get("subject"),
+        "body": result.get("body", ""),
+        "notes": result.get("notes", ""),
+        "lead": {"id": str(lead.id), "name": lead.full_name},
+    }
+
+
+@router.get("/{message_id}", response_model=MessageResponse)
+async def get_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return MessageResponse.model_validate(message)
+
+
+@router.get("/{message_id}/suggest-reply")
+async def suggest_reply(message_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get AI-suggested reply for an inbound message."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message.direction != "inbound":
+        raise HTTPException(status_code=400, detail="Can only suggest replies for inbound messages")
+
+    # Find the original outbound message in the same thread
+    lead_result = await db.execute(
+        select(Lead).options(selectinload(Lead.company)).where(Lead.id == message.lead_id)
+    )
+    lead = lead_result.scalar_one_or_none()
+
+    # Get last outbound message to this lead
+    outbound = await db.execute(
+        select(Message)
+        .where(Message.lead_id == message.lead_id, Message.direction == "outbound")
+        .order_by(Message.created_at.desc())
+        .limit(1)
+    )
+    original = outbound.scalar_one_or_none()
+
+    reply = await ai_engine.suggest_reply(
+        original_message=original.body if original else "",
+        response_text=message.body,
+        lead_name=lead.full_name if lead else "Unknown",
+        lead_company=lead.company.name if lead and lead.company else "Unknown",
+        classification=message.classification or "interested",
+    )
+
+    return {"suggested_reply": reply, "message_id": str(message.id)}
+
+
+@router.post("/{message_id}/classify")
+async def classify_message(
+    message_id: uuid.UUID,
+    classification: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually override AI classification."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    valid = [
+        "interested", "not_interested", "out_of_office", "wrong_person",
+        "requesting_info", "meeting_request", "objection", "referral", "unsubscribe",
+    ]
+    if classification not in valid:
+        raise HTTPException(status_code=400, detail=f"Must be one of: {valid}")
+
+    message.classification = classification
+    message.classification_confidence = 1.0  # Manual = 100% confidence
+
+    await db.commit()
+    return {"success": True, "classification": classification}

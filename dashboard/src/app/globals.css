@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  /* Apex Human Brand Colors */
+  --color-crimson: #7B1620;
+  --color-crimson-dark: #560F17;
+  --color-crimson-mid: #9E2030;
+  --color-creme: #F5EDD9;
+  --color-rich-creme: #EAD9B8;
+  --color-warm-charcoal: #2E1A1A;
+  --color-mid-warm: #7A5C5C;
+
+  /* Font families */
+  --font-display: "Palatino Linotype", "Palatino", "Book Antiqua", Georgia, serif;
+  --font-body: Georgia, "Times New Roman", serif;
+  --font-label: "Arial Narrow", Arial, sans-serif;
+}
+
+body {
+  background-color: var(--color-creme);
+  color: var(--color-warm-charcoal);
+  font-family: var(--font-body);
+}
