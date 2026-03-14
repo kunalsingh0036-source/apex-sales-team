@@ -51,6 +51,13 @@ interface DashboardStats {
   pipeline: Record<string, number>;
   classifications: Record<string, number>;
   active_seasons: { name: string; type: string }[];
+  // CRM
+  total_clients: number;
+  active_orders: number;
+  pipeline_value: number;
+  monthly_revenue: number;
+  pending_quotes: number;
+  ama_distribution: Record<string, number>;
 }
 
 export default function DashboardPage() {
@@ -110,6 +117,32 @@ export default function DashboardPage() {
               ? `${stats.total_replies} replies / ${stats.total_sent} sent`
               : "Awaiting data"
           }
+        />
+      </div>
+
+      {/* CRM Metrics */}
+      <div className="grid grid-cols-4 gap-6 mb-8">
+        <MetricCard
+          label="Active Clients"
+          value={loading ? "..." : String(stats?.total_clients || 0)}
+          subtext="CRM"
+        />
+        <MetricCard
+          label="Active Orders"
+          value={loading ? "..." : String(stats?.active_orders || 0)}
+          subtext="In pipeline"
+        />
+        <MetricCard
+          label="Pipeline Value"
+          value={loading ? "..." : stats?.pipeline_value
+            ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(stats.pipeline_value)
+            : "₹0"}
+          subtext="Total order value"
+        />
+        <MetricCard
+          label="Pending Quotes"
+          value={loading ? "..." : String(stats?.pending_quotes || 0)}
+          subtext="Draft, sent, viewed"
         />
       </div>
 
@@ -173,6 +206,21 @@ export default function DashboardPage() {
                 className="block w-full px-4 py-3 border border-rich-creme text-warm-charcoal rounded text-center text-sm font-bold hover:border-crimson hover:text-crimson transition-colors"
               >
                 Open Inbox
+              </Link>
+            </div>
+            <div className="mt-3 pt-3 border-t border-rich-creme space-y-3">
+              <p className="font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">CRM</p>
+              <Link
+                href="/clients"
+                className="block w-full px-4 py-3 bg-rich-creme text-crimson-dark rounded text-center text-sm font-bold hover:bg-creme transition-colors"
+              >
+                View Clients
+              </Link>
+              <Link
+                href="/orders"
+                className="block w-full px-4 py-3 border border-crimson text-crimson rounded text-center text-sm font-bold hover:bg-crimson hover:text-creme transition-colors"
+              >
+                Order Pipeline
               </Link>
             </div>
           </div>
