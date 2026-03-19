@@ -142,7 +142,7 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)):
         "pipeline": pipeline,
         "classifications": classifications,
         "active_seasons": [
-            {"name": s["name"], "type": s["type"]}
+            {"name": s["name"], "key": s.get("key", ""), "message_angle": s.get("message_angle", "")}
             for s in active_seasons
         ],
         # CRM

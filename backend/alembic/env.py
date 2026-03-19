@@ -1,7 +1,11 @@
 import os
+import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
+
+# Add the backend directory to path so 'app' is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 config = context.config
 
@@ -20,10 +24,6 @@ from app.models.lead import Company, Lead, LeadEvent
 from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.message import MessageTemplate, Message
 from app.models.activity import Activity
-from app.models.client import Client, ClientContact, BrandAsset, Interaction, SampleKit
-from app.models.product import ProductCategory, Product
-from app.models.order import Order, OrderItem, OrderStageLog
-from app.models.quote import Quote, QuoteItem
 from app.models.analytics import DailyMetric, ABTestResult
 
 target_metadata = Base.metadata
