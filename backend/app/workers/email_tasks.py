@@ -4,9 +4,35 @@ Handles scheduled sending, reply checking, and sequence advancement.
 """
 
 import asyncio
+import logging
+import re
 from datetime import datetime, timezone
 from sqlalchemy import select
 from app.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
+
+GENERIC_PATTERNS = [
+    r"reaching out about a potential partnership",
+    r"Regarding .+ partnership",
+    r"reaching out about a potential collaboration",
+]
+GENERIC_RE = re.compile("|".join(GENERIC_PATTERNS), re.IGNORECASE)
+MIN_BODY_LENGTH = 50
+
+
+def _content_passes_quality(subject: str | None, body: str) -> tuple[bool, str]:
+    """Check if message content is good enough to send.
+
+    Returns (passes, reason).
+    """
+    if not body or len(body.strip()) < MIN_BODY_LENGTH:
+        return False, f"body too short ({len(body.strip())} chars, min {MIN_BODY_LENGTH})"
+    if GENERIC_RE.search(body):
+        return False, "body matches generic placeholder pattern"
+    if subject and GENERIC_RE.search(subject):
+        return False, "subject matches generic placeholder pattern"
+    return True, ""
 
 
 def run_async(coro):
@@ -23,13 +49,13 @@ def send_email(message_id: str):
     """Send a single queued email message."""
     from app.services.email_service import gmail_service
     from app.core.rate_limiter import rate_limiter
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
     from app.models.lead import Lead
     from app.models.activity import Activity
 
     async def _send():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             result = await db.execute(
                 select(Message).where(Message.id == message_id)
             )
@@ -50,6 +76,16 @@ def send_email(message_id: str):
                 message.status = "failed"
                 await db.commit()
                 return {"status": "failed", "reason": "do_not_contact"}
+
+            # Content quality gate — reject generic/placeholder messages
+            passes, reason = _content_passes_quality(message.subject, message.body)
+            if not passes:
+                message.status = "content_review"
+                await db.commit()
+                logger.warning(
+                    f"Message {message_id} held for content review: {reason}"
+                )
+                return {"status": "content_review", "reason": reason}
 
             can_send = await rate_limiter.can_send("email")
             if not can_send:
@@ -88,11 +124,11 @@ def send_email(message_id: str):
 @celery_app.task(name="app.workers.email_tasks.process_scheduled_sends")
 def process_scheduled_sends():
     """Dispatch queued email messages that are scheduled for now."""
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
 
     async def _process():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             now = datetime.now(timezone.utc)
             result = await db.execute(
                 select(Message)
@@ -118,12 +154,12 @@ def check_replies():
     """Periodic task: check inbox for new replies and classify them."""
     from app.services.email_service import gmail_service
     from app.services.outreach_orchestrator import orchestrator
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
     from app.models.lead import Lead
 
     async def _check():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             replies = await gmail_service.check_replies()
             processed = 0
 
@@ -166,11 +202,11 @@ def check_replies():
 def advance_sequences():
     """Advance campaign enrollments that are due for their next step."""
     from app.services.outreach_orchestrator import orchestrator
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.sequence import CampaignEnrollment
 
     async def _advance():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             now = datetime.now(timezone.utc)
             result = await db.execute(
                 select(CampaignEnrollment)

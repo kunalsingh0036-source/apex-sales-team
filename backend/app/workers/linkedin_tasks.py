@@ -22,13 +22,13 @@ def send_linkedin_message(message_id: str):
     """Send a LinkedIn message (connection request, DM, or InMail)."""
     from app.services.linkedin_service import linkedin_service
     from app.core.rate_limiter import rate_limiter
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
     from app.models.lead import Lead
     from app.models.activity import Activity
 
     async def _send():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             result = await db.execute(
                 select(Message).where(Message.id == message_id)
             )
@@ -111,11 +111,11 @@ def send_linkedin_message(message_id: str):
 @celery_app.task(name="app.workers.linkedin_tasks.process_linkedin_queue")
 def process_linkedin_queue():
     """Dispatch queued LinkedIn messages that are scheduled for now."""
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
 
     async def _process():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             now = datetime.now(timezone.utc)
             result = await db.execute(
                 select(Message)

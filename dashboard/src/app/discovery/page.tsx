@@ -144,7 +144,7 @@ export default function DiscoveryPage() {
       <Header title="Lead Discovery" />
 
       {/* Search Panel */}
-      <div className="bg-white rounded-lg p-6 border border-rich-creme mb-6">
+      <div className="bg-white rounded-xl p-7 border border-rich-creme mb-6">
         <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
           Search for Leads (Apollo.io)
         </h3>
@@ -159,7 +159,7 @@ export default function DiscoveryPage() {
               <button
                 key={role}
                 onClick={() => toggleRole(role)}
-                className={`text-xs px-3 py-1.5 rounded border transition-colors ${
+                className={`text-sm px-3.5 py-2 rounded border transition-colors ${
                   form.job_titles.includes(role)
                     ? "bg-crimson text-white border-crimson"
                     : "border-rich-creme text-warm-charcoal hover:border-crimson"
@@ -181,7 +181,7 @@ export default function DiscoveryPage() {
               <button
                 key={ind.value}
                 onClick={() => toggleIndustry(ind.value)}
-                className={`text-xs px-3 py-1.5 rounded border transition-colors ${
+                className={`text-sm px-3.5 py-2 rounded border transition-colors ${
                   form.industries.includes(ind.value)
                     ? "bg-crimson text-white border-crimson"
                     : "border-rich-creme text-warm-charcoal hover:border-crimson"
@@ -247,34 +247,35 @@ export default function DiscoveryPage() {
 
       {/* Results */}
       {results.length > 0 && (
-        <div className="bg-white rounded-lg border border-rich-creme overflow-hidden mb-6">
-          <div className="px-4 py-3 bg-creme/50 border-b border-rich-creme flex justify-between items-center">
+        <div className="bg-white rounded-xl border border-rich-creme overflow-hidden mb-6">
+          <div className="px-5 py-3.5 bg-creme/50 border-b border-rich-creme flex justify-between items-center">
             <p className="text-sm font-bold text-warm-charcoal">
               {totalResults.toLocaleString()} results found
             </p>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-rich-creme">
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Name</th>
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Title</th>
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Company</th>
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Industry</th>
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Email</th>
-                <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">City</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Name</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Title</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Company</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Industry</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Email</th>
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">City</th>
               </tr>
             </thead>
             <tbody>
               {results.map((person, i) => (
                 <tr key={i} className="border-b border-rich-creme/50 hover:bg-creme/30">
-                  <td className="px-4 py-3 text-sm font-bold text-warm-charcoal">
+                  <td className="px-5 py-3.5 text-sm font-bold text-warm-charcoal max-w-[150px] truncate">
                     {person.name}
                     {person.linkedin_url && (
                       <span className="text-sky-600 ml-1 text-xs">in</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-sm text-warm-charcoal">{person.title}</td>
-                  <td className="px-4 py-3 text-sm text-warm-charcoal">
+                  <td className="px-5 py-3.5 text-sm text-warm-charcoal max-w-[150px] truncate">{person.title}</td>
+                  <td className="px-5 py-3.5 text-sm text-warm-charcoal max-w-[150px] truncate">
                     {person.company?.name}
                     {person.company?.employee_count && (
                       <span className="text-xs text-mid-warm ml-1">
@@ -282,24 +283,25 @@ export default function DiscoveryPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-5 py-3.5">
                     <Badge variant="default">{person.company?.industry || "—"}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-warm-charcoal">
+                  <td className="px-5 py-3.5 text-sm font-mono text-warm-charcoal max-w-[160px] truncate">
                     {person.email || <span className="text-mid-warm italic">hidden</span>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-mid-warm">{person.city}</td>
+                  <td className="px-5 py-3.5 text-xs text-mid-warm">{person.city}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Tools row */}
       <div className="grid grid-cols-2 gap-6">
         {/* Email Verification */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">
             Email Verification (Hunter.io)
           </h3>
@@ -325,7 +327,7 @@ export default function DiscoveryPage() {
         </div>
 
         {/* Email Finder */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">
             Email Finder (Hunter.io)
           </h3>

@@ -82,3 +82,11 @@ class GenerateMessageRequest(BaseModel):
     message_type: str = "cold_intro"
     context: str = ""
     custom_instructions: str = ""
+
+
+class ApproveBatchRequest(BaseModel):
+    message_ids: list[uuid.UUID]
+
+
+class RegenerateRequest(BaseModel):
+    custom_instructions: str = ""

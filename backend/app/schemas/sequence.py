@@ -81,6 +81,18 @@ class CampaignResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class EnrollmentLeadSummary(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    email: Optional[str] = None
+    job_title: str
+    company_name: Optional[str] = None
+    lead_score: int = 0
+    stage: str = "prospect"
+
+    model_config = {"from_attributes": True}
+
+
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
     campaign_id: uuid.UUID
@@ -91,6 +103,7 @@ class EnrollmentResponse(BaseModel):
     enrolled_at: datetime
     last_step_at: Optional[datetime]
     next_step_at: Optional[datetime]
+    lead: Optional[EnrollmentLeadSummary] = None
 
     model_config = {"from_attributes": True}
 

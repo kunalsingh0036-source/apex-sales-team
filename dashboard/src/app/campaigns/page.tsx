@@ -74,6 +74,16 @@ export default function CampaignsPage() {
     }
   }
 
+  async function handleDeleteCampaign(id: string, name: string) {
+    if (!confirm(`Delete campaign "${name}"? This will remove all enrollments and cannot be undone.`)) return;
+    try {
+      await api.campaigns.delete(id);
+      fetchData();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    }
+  }
+
   const statusVariant: Record<string, "default" | "success" | "warning" | "crimson" | "info"> = {
     draft: "default",
     active: "success",
@@ -95,7 +105,7 @@ export default function CampaignsPage() {
       </div>
 
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="mb-6 bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Create Campaign
           </h3>
@@ -138,7 +148,7 @@ export default function CampaignsPage() {
       )}
 
       {!loading && campaigns.length === 0 && (
-        <div className="bg-white rounded-lg p-12 text-center border border-rich-creme">
+        <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No campaigns yet</p>
           <p className="text-mid-warm text-sm">
             Create a sequence first, then create a campaign to enroll leads.
@@ -151,17 +161,17 @@ export default function CampaignsPage() {
           {campaigns.map((c) => (
             <div
               key={c.id}
-              className="bg-white rounded-lg p-6 border border-rich-creme"
+              className="bg-white rounded-xl p-7 border border-rich-creme"
             >
               <div className="flex items-start justify-between">
                 <div>
                   <Link
                     href={`/campaigns/${c.id}`}
-                    className="font-display text-lg font-bold text-crimson-dark hover:text-crimson"
+                    className="font-display text-xl font-bold text-crimson-dark hover:text-crimson"
                   >
                     {c.name}
                   </Link>
-                  <div className="flex items-center gap-3 mt-2 text-sm text-mid-warm">
+                  <div className="flex items-center gap-4 mt-3 text-sm text-mid-warm">
                     <span>{c.total_leads} leads enrolled</span>
                     {c.sequence && <span>Sequence: {c.sequence.name}</span>}
                     {c.started_at && (
@@ -198,6 +208,32 @@ export default function CampaignsPage() {
                       onClick={() => handleStatusChange(c.id, "active")}
                     >
                       Resume
+                    </Button>
+                  )}
+                  {c.status === "completed" && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStatusChange(c.id, "active")}
+                    >
+                      Reactivate
+                    </Button>
+                  )}
+                  {(c.status === "active" || c.status === "paused") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusChange(c.id, "completed")}
+                    >
+                      Complete
+                    </Button>
+                  )}
+                  {c.status !== "active" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDeleteCampaign(c.id, c.name)}
+                    >
+                      Delete
                     </Button>
                   )}
                 </div>

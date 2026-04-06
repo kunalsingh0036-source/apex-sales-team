@@ -4,31 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
+import MetricCard from "@/components/ui/MetricCard";
 import { api } from "@/lib/api-client";
-
-function MetricCard({
-  label,
-  value,
-  subtext,
-}: {
-  label: string;
-  value: string;
-  subtext?: string;
-}) {
-  return (
-    <div className="bg-white rounded-lg p-6 shadow-sm border border-rich-creme">
-      <p className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-2">
-        {label}
-      </p>
-      <p className="font-display text-3xl font-bold text-crimson-dark">
-        {value}
-      </p>
-      {subtext && (
-        <p className="text-sm text-mid-warm mt-1">{subtext}</p>
-      )}
-    </div>
-  );
-}
 
 const STAGE_CONFIG: { key: string; label: string; color: string }[] = [
   { key: "prospect", label: "Prospect", color: "bg-gray-400" },
@@ -87,7 +64,7 @@ export default function DashboardPage() {
       <Header title="Dashboard" />
 
       {/* Overview Metrics */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-3 gap-6 mb-10">
         <MetricCard
           label="Total Leads"
           value={loading ? "..." : String(stats?.total_leads || 0)}
@@ -121,7 +98,7 @@ export default function DashboardPage() {
       </div>
 
       {/* CRM Metrics */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-3 gap-6 mb-10">
         <MetricCard
           label="Active Clients"
           value={loading ? "..." : String(stats?.total_clients || 0)}
@@ -148,7 +125,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-3 gap-6">
         {/* Pipeline */}
-        <div className="col-span-2 bg-white rounded-lg p-6 shadow-sm border border-rich-creme">
+        <div className="col-span-2 bg-white rounded-xl p-8 shadow-sm border border-rich-creme">
           <h3 className="font-display text-xl font-bold text-crimson-dark mb-6">
             Pipeline
           </h3>
@@ -159,7 +136,7 @@ export default function DashboardPage() {
               return (
                 <div key={stage.key} className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${stage.color}`} />
-                  <span className="text-sm text-warm-charcoal w-28">{stage.label}</span>
+                  <span className="text-sm text-warm-charcoal w-32 truncate">{stage.label}</span>
                   <div className="flex-1 bg-creme rounded-full h-2.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full ${stage.color} transition-all`}
@@ -178,32 +155,32 @@ export default function DashboardPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Quick Actions */}
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-rich-creme">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-rich-creme">
             <h3 className="font-display text-xl font-bold text-crimson-dark mb-4">
               Quick Actions
             </h3>
             <div className="space-y-3">
               <Link
                 href="/leads"
-                className="block w-full px-4 py-3 bg-crimson text-creme rounded text-center text-sm font-bold hover:bg-crimson-dark transition-colors"
+                className="block w-full px-5 py-3.5 bg-crimson text-creme rounded text-center text-sm font-bold hover:bg-crimson-dark transition-colors"
               >
                 View Leads
               </Link>
               <Link
                 href="/sequences"
-                className="block w-full px-4 py-3 bg-rich-creme text-crimson-dark rounded text-center text-sm font-bold hover:bg-creme transition-colors"
+                className="block w-full px-5 py-3.5 bg-rich-creme text-crimson-dark rounded text-center text-sm font-bold hover:bg-creme transition-colors"
               >
                 Create Sequence
               </Link>
               <Link
                 href="/campaigns"
-                className="block w-full px-4 py-3 border border-crimson text-crimson rounded text-center text-sm font-bold hover:bg-crimson hover:text-creme transition-colors"
+                className="block w-full px-5 py-3.5 border border-crimson text-crimson rounded text-center text-sm font-bold hover:bg-crimson hover:text-creme transition-colors"
               >
                 Create Campaign
               </Link>
               <Link
                 href="/messages"
-                className="block w-full px-4 py-3 border border-rich-creme text-warm-charcoal rounded text-center text-sm font-bold hover:border-crimson hover:text-crimson transition-colors"
+                className="block w-full px-5 py-3.5 border border-rich-creme text-warm-charcoal rounded text-center text-sm font-bold hover:border-crimson hover:text-crimson transition-colors"
               >
                 Open Inbox
               </Link>
@@ -212,13 +189,13 @@ export default function DashboardPage() {
               <p className="font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">CRM</p>
               <Link
                 href="/clients"
-                className="block w-full px-4 py-3 bg-rich-creme text-crimson-dark rounded text-center text-sm font-bold hover:bg-creme transition-colors"
+                className="block w-full px-5 py-3.5 bg-rich-creme text-crimson-dark rounded text-center text-sm font-bold hover:bg-creme transition-colors"
               >
                 View Clients
               </Link>
               <Link
                 href="/orders"
-                className="block w-full px-4 py-3 border border-crimson text-crimson rounded text-center text-sm font-bold hover:bg-crimson hover:text-creme transition-colors"
+                className="block w-full px-5 py-3.5 border border-crimson text-crimson rounded text-center text-sm font-bold hover:bg-crimson hover:text-creme transition-colors"
               >
                 Order Pipeline
               </Link>
@@ -227,7 +204,7 @@ export default function DashboardPage() {
 
           {/* Response Classifications */}
           {stats && Object.keys(stats.classifications).length > 0 && (
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-rich-creme">
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-rich-creme">
               <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
                 Reply Classifications
               </h3>
@@ -255,7 +232,7 @@ export default function DashboardPage() {
           )}
 
           {/* Active Seasons */}
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-rich-creme">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
               Active Seasons
             </h3>

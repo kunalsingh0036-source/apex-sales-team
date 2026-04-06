@@ -81,7 +81,7 @@ export default function OrderDetailPage() {
       <Header title={order.order_number} />
 
       {/* Stage Progress Bar */}
-      <div className="bg-white rounded-lg border border-rich-creme p-6 mb-6">
+      <div className="bg-white rounded-xl border border-rich-creme p-8 mb-6">
         <div className="flex items-center justify-between">
           {ALL_STAGES.map((stage, idx) => {
             const isPast = idx < currentIdx;
@@ -91,7 +91,7 @@ export default function OrderDetailPage() {
                 <div className="flex flex-col items-center flex-1">
                   <div
                     className={clsx(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                      "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold",
                       isCurrent ? "bg-crimson text-creme" :
                       isPast ? "bg-green-500 text-white" :
                       "bg-rich-creme text-mid-warm"
@@ -114,7 +114,7 @@ export default function OrderDetailPage() {
 
       {/* Stage Advancement */}
       {nextStages.length > 0 && (
-        <div className="bg-white rounded-lg border border-rich-creme p-4 mb-6">
+        <div className="bg-white rounded-xl border border-rich-creme p-4 mb-6">
           <div className="flex items-center gap-4">
             <input
               type="text"
@@ -142,7 +142,7 @@ export default function OrderDetailPage() {
         {/* Order Info */}
         <div className="col-span-2 space-y-6">
           {/* Line Items */}
-          <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+          <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
             <div className="px-4 py-3 bg-creme/30 border-b border-rich-creme">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase">Line Items</h4>
             </div>
@@ -184,7 +184,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Stage History */}
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-4">
             <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-4">Stage History</h4>
             <div className="space-y-3">
               {stageHistory.map((log) => (
@@ -210,7 +210,7 @@ export default function OrderDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-4">
             <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Order Info</h4>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -237,7 +237,7 @@ export default function OrderDetailPage() {
           </div>
 
           {order.notes && (
-            <div className="bg-white rounded-lg border border-rich-creme p-4">
+            <div className="bg-white rounded-xl border border-rich-creme p-4">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Notes</h4>
               <p className="text-sm text-warm-charcoal whitespace-pre-line">{order.notes}</p>
             </div>

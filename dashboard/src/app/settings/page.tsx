@@ -31,14 +31,14 @@ export default function SettingsPage() {
     <div>
       <Header title="Settings" />
 
-      <div className="space-y-6 max-w-3xl">
+      <div className="space-y-6 max-w-4xl">
         {/* Integration Status */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Integration Status
           </h3>
           {config?.integrations ? (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-4">
               {Object.entries(config.integrations).map(([name, connected]) => (
                 <div
                   key={name}
@@ -62,7 +62,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Rate Limits */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Daily Rate Limits
           </h3>
@@ -104,7 +104,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Sender Info */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Sender Configuration
           </h3>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Brand Voice */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Brand Voice
           </h3>
@@ -167,7 +167,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Sequence Timing */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Send Window & Timing
           </h3>

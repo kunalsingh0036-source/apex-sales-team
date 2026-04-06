@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import leads, companies, sequences, campaigns, templates, messages, dashboard, webhooks, discovery, analytics, settings
+from app.api.v1 import leads, companies, sequences, campaigns, templates, messages, dashboard, webhooks, discovery, analytics, settings, automation
 from app.api.v1 import clients, orders, products, quotes, revenue
 
 api_router = APIRouter()
@@ -15,6 +15,7 @@ api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"]
 api_router.include_router(discovery.router, prefix="/discovery", tags=["Discovery"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
 api_router.include_router(settings.router, prefix="/settings", tags=["Settings"])
+api_router.include_router(automation.router, prefix="/automation", tags=["Automation"])
 
 # CRM
 api_router.include_router(clients.router, prefix="/clients", tags=["Clients"])

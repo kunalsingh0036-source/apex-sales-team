@@ -96,7 +96,7 @@ export default function LeadsPage() {
 
       {/* Controls */}
       <div className="flex items-center justify-between mb-6 gap-4">
-        <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-md">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-lg">
           <input
             type="text"
             value={search}
@@ -180,11 +180,11 @@ export default function LeadsPage() {
 
       {/* Add Lead Form */}
       {showAddForm && (
-        <div className="mb-6 bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="mb-6 bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Add New Lead
           </h3>
-          <form onSubmit={handleAddLead} className="grid grid-cols-3 gap-4">
+          <form onSubmit={handleAddLead} className="grid grid-cols-2 gap-5">
             <input
               required
               placeholder="First Name *"
@@ -232,7 +232,7 @@ export default function LeadsPage() {
               <option value="C-Suite">C-Suite</option>
               <option value="Other">Other</option>
             </select>
-            <div className="col-span-3 flex gap-3">
+            <div className="col-span-2 flex gap-3">
               <Button type="submit" size="sm">
                 Save Lead
               </Button>

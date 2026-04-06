@@ -61,16 +61,16 @@ export default function ProductsPage() {
       <Header title="Product Catalogue" />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+      <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Products</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>
         </div>
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Categories</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{categories.length}</p>
         </div>
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Active Products</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">
             {products.filter((p) => p.is_active).length}
@@ -110,18 +110,18 @@ export default function ProductsPage() {
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {products.map((product) => (
-            <div key={product.id} className="bg-white rounded-lg border border-rich-creme p-4 hover:shadow transition-shadow">
+            <div key={product.id} className="bg-white rounded-xl border border-rich-creme p-5 hover:shadow transition-shadow">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="font-bold text-sm text-crimson-dark">{product.name}</h3>
-                  {product.sku && <p className="text-xs text-mid-warm mt-0.5">SKU: {product.sku}</p>}
+                  <h3 className="font-bold text-sm text-crimson-dark truncate">{product.name}</h3>
+                  {product.sku && <p className="text-xs text-mid-warm mt-0.5 truncate">SKU: {product.sku}</p>}
                 </div>
                 <Badge variant={product.is_active ? "success" : "default"}>
                   {product.is_active ? "Active" : "Inactive"}
                 </Badge>
               </div>
 
-              <p className="text-xs text-mid-warm mb-3">{getCategoryName(product.category_id)}</p>
+              <p className="text-xs text-mid-warm mb-3 truncate">{getCategoryName(product.category_id)}</p>
 
               {product.description && (
                 <p className="text-xs text-warm-charcoal mb-3 line-clamp-2">{product.description}</p>

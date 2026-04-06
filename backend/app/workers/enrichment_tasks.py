@@ -20,10 +20,10 @@ def run_async(coro):
 def enrich_lead(lead_id: str):
     """Run full enrichment pipeline for a single lead."""
     from app.services.enrichment_service import enrichment_service
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
 
     async def _enrich():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             return await enrichment_service.enrich_lead(lead_id, db)
 
     return run_async(_enrich())
@@ -33,10 +33,10 @@ def enrich_lead(lead_id: str):
 def enrich_company(company_id: str):
     """Run enrichment pipeline for a company."""
     from app.services.enrichment_service import enrichment_service
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
 
     async def _enrich():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             return await enrichment_service.enrich_company(company_id, db)
 
     return run_async(_enrich())
@@ -46,11 +46,11 @@ def enrich_company(company_id: str):
 def batch_score_leads():
     """Score all unscored leads (lead_score is None or 0)."""
     from app.services.lead_scoring import lead_scoring
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.lead import Lead, Company
 
     async def _batch():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             result = await db.execute(
                 select(Lead)
                 .where(Lead.lead_score.is_(None) | (Lead.lead_score == 0))
@@ -109,7 +109,7 @@ def import_from_apollo(search_params: dict):
     }
     """
     from app.services.lead_discovery import lead_discovery
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.lead import Lead, Company
 
     async def _import():
@@ -119,7 +119,7 @@ def import_from_apollo(search_params: dict):
         page = 1
         per_page = 25
 
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             while imported + skipped < max_results:
                 result = await lead_discovery.search_people(
                     **search_params, page=page, per_page=per_page

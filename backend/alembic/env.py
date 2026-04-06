@@ -5,7 +5,17 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 
 # Add the backend directory to path so 'app' is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+backend_dir = os.path.join(os.path.dirname(__file__), "..")
+sys.path.insert(0, backend_dir)
+
+# Load .env from project root (for local dev)
+env_file = os.path.join(backend_dir, "..", ".env")
+if os.path.exists(env_file):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_file)
+    except ImportError:
+        pass  # dotenv not installed, rely on shell env
 
 config = context.config
 
@@ -25,6 +35,14 @@ from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.message import MessageTemplate, Message
 from app.models.activity import Activity
 from app.models.analytics import DailyMetric, ABTestResult
+# CRM models
+try:
+    from app.models.client import Client, ClientContact, BrandAsset, Interaction, SampleKit
+    from app.models.product import ProductCategory, Product
+    from app.models.order import Order, OrderItem, OrderStageLog
+    from app.models.quote import Quote, QuoteItem
+except ImportError:
+    pass  # CRM models may not exist yet
 
 target_metadata = Base.metadata
 

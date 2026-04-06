@@ -1,5 +1,11 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from dotenv import load_dotenv
+
+# Resolve .env from project root (one level above backend/)
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(_ENV_FILE, override=True)
 
 
 class Settings(BaseSettings):
@@ -49,7 +55,7 @@ class Settings(BaseSettings):
     gmb_account_id: str = ""
     gmb_location_id: str = ""
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
 
 
 @lru_cache

@@ -4,19 +4,8 @@ import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import MetricCard from "@/components/ui/MetricCard";
 import { api } from "@/lib/api-client";
-
-function MetricCard({ label, value, subtext, color }: {
-  label: string; value: string; subtext?: string; color?: string;
-}) {
-  return (
-    <div className="bg-white rounded-lg p-5 border border-rich-creme">
-      <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">{label}</p>
-      <p className={`font-display text-2xl font-bold ${color || "text-crimson-dark"}`}>{value}</p>
-      {subtext && <p className="text-xs text-mid-warm mt-1">{subtext}</p>}
-    </div>
-  );
-}
 
 const STAGE_LABELS: Record<string, string> = {
   prospect: "Prospect", contacted: "Contacted", engaged: "Engaged",
@@ -94,7 +83,7 @@ export default function AnalyticsPage() {
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`text-xs px-3 py-1.5 rounded border transition-colors ${
+            className={`text-sm px-4 py-2 rounded border transition-colors ${
               days === d
                 ? "bg-crimson text-white border-crimson"
                 : "border-rich-creme text-warm-charcoal hover:border-crimson"
@@ -110,18 +99,18 @@ export default function AnalyticsPage() {
 
       {/* Overview metrics */}
       {overview && (
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-6 mb-10">
           <MetricCard label="Total Sent" value={String(overview.total_sent)} />
           <MetricCard label="Total Replied" value={String(overview.total_replied)} />
-          <MetricCard label="Reply Rate" value={`${overview.reply_rate}%`} color="text-green-700" />
-          <MetricCard label="Positive Replies" value={String(overview.total_positive_replies)} color="text-green-700" />
-          <MetricCard label="Meetings" value={String(overview.total_meetings)} color="text-blue-700" />
+          <MetricCard label="Reply Rate" value={`${overview.reply_rate}%`} accent="text-green-700" />
+          <MetricCard label="Positive Replies" value={String(overview.total_positive_replies)} accent="text-green-700" />
+          <MetricCard label="Meetings" value={String(overview.total_meetings)} accent="text-blue-700" />
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-6 mb-8">
         {/* Pipeline Funnel */}
-        <div className="col-span-2 bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="col-span-2 bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Pipeline Funnel</h3>
           <div className="space-y-3">
             {funnel.map((stage) => {
@@ -129,7 +118,7 @@ export default function AnalyticsPage() {
               return (
                 <div key={stage.stage} className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${STAGE_COLORS[stage.stage] || "bg-gray-400"}`} />
-                  <span className="text-sm text-warm-charcoal w-28">
+                  <span className="text-sm text-warm-charcoal w-28 truncate">
                     {STAGE_LABELS[stage.stage] || stage.stage}
                   </span>
                   <div className="flex-1 bg-creme rounded-full h-3 overflow-hidden">
@@ -149,7 +138,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Lead Score Distribution */}
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Lead Scores</h3>
           {leadScores.length > 0 ? (
             <div className="space-y-3">
@@ -176,19 +165,20 @@ export default function AnalyticsPage() {
 
       {/* Channel Comparison */}
       {channels.length > 0 && (
-        <div className="bg-white rounded-lg p-6 border border-rich-creme mb-8">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme mb-8">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Channel Comparison</h3>
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-rich-creme">
-                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Channel</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Sent</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Replied</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Reply Rate</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Positive</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Positive Rate</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Meetings</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Bounced</th>
+                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Channel</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Sent</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Replied</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Reply Rate</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Positive</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Positive Rate</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Meetings</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Bounced</th>
               </tr>
             </thead>
             <tbody>
@@ -211,28 +201,29 @@ export default function AnalyticsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {/* Campaign Metrics */}
       {campaignMetrics.length > 0 && (
-        <div className="bg-white rounded-lg p-6 border border-rich-creme mb-8">
+        <div className="bg-white rounded-xl p-6 border border-rich-creme mb-8">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Campaign Performance</h3>
           <table className="w-full">
             <thead>
               <tr className="border-b border-rich-creme">
-                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Campaign</th>
-                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Status</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Enrolled</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Active</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Replied</th>
-                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase">Reply Rate</th>
+                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Campaign</th>
+                <th className="text-left px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Status</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Enrolled</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Active</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Replied</th>
+                <th className="text-right px-4 py-2 font-label text-xs tracking-wider text-mid-warm uppercase whitespace-nowrap">Reply Rate</th>
               </tr>
             </thead>
             <tbody>
               {campaignMetrics.map((c) => (
                 <tr key={c.id} className="border-b border-rich-creme/50">
-                  <td className="px-4 py-3 text-sm font-bold text-warm-charcoal">{c.name}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-warm-charcoal truncate max-w-[250px]">{c.name}</td>
                   <td className="px-4 py-3">
                     <Badge variant={c.status === "active" ? "success" : c.status === "paused" ? "warning" : "default"}>
                       {c.status}
@@ -250,7 +241,7 @@ export default function AnalyticsPage() {
       )}
 
       {/* AI Insights */}
-      <div className="bg-white rounded-lg p-6 border border-rich-creme">
+      <div className="bg-white rounded-xl p-6 border border-rich-creme">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-lg font-bold text-crimson-dark">AI Trend Analysis</h3>
           <Button size="sm" onClick={handleAiInsights} disabled={loadingInsights}>

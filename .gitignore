@@ -1,6 +1,18 @@
 # Environment
 .env
+.env.save
 *.env.local
+
+# Logs & PIDs
+.logs/
+.pids/
+
+# Claude
+.claude/
+
+# Celery
+celerybeat-schedule.db
+backend/celerybeat-schedule.db
 
 # Python
 __pycache__/

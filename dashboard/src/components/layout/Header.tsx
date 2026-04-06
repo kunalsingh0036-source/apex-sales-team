@@ -2,7 +2,7 @@
 
 export default function Header({ title }: { title: string }) {
   return (
-    <header className="flex items-center justify-between mb-8">
+    <header className="flex items-center justify-between mb-10 pb-6 border-b border-rich-creme/60">
       <h2 className="font-display text-3xl font-bold text-crimson-dark">
         {title}
       </h2>

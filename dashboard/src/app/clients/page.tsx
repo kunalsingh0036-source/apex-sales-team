@@ -52,13 +52,13 @@ export default function ClientsPage() {
       <Header title="Clients" />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+      <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Clients</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>
         </div>
         {(["bronze", "silver", "gold", "institutional"] as AMATier[]).map((tier) => (
-          <div key={tier} className="bg-white rounded-lg border border-rich-creme p-4">
+          <div key={tier} className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">{AMA_TIER_LABELS[tier]}</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">
               {clients.filter((c) => c.ama_tier === tier).length}
@@ -103,7 +103,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+      <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-rich-creme bg-creme/30">
@@ -127,14 +127,14 @@ export default function ClientsPage() {
               clients.map((client) => (
                 <tr key={client.id} className="border-b border-rich-creme/50 hover:bg-creme/20 transition-colors">
                   <td className="px-4 py-3">
-                    <Link href={`/clients/${client.id}`} className="font-bold text-crimson-dark hover:text-crimson">
+                    <Link href={`/clients/${client.id}`} className="font-bold text-crimson-dark hover:text-crimson truncate block">
                       {client.primary_contact_name}
                     </Link>
                     {client.primary_contact_title && (
                       <p className="text-xs text-mid-warm mt-0.5">{client.primary_contact_title}</p>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-warm-charcoal">{client.primary_contact_email || "—"}</td>
+                  <td className="px-4 py-3 text-warm-charcoal truncate max-w-[200px]">{client.primary_contact_email || "—"}</td>
                   <td className="px-4 py-3">
                     {client.ama_tier ? (
                       <span className={clsx("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold", AMA_TIER_COLORS[client.ama_tier as AMATier])}>

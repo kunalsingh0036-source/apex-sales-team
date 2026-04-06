@@ -10,7 +10,7 @@ from app.config import get_settings
 class LeadDiscoveryService:
     """Discover leads from external data sources."""
 
-    APOLLO_BASE = "https://api.apollo.io/v1"
+    APOLLO_BASE = "https://api.apollo.io/api/v1"
     HUNTER_BASE = "https://api.hunter.io/v2"
 
     # ─── Apollo.io ──────────────────────────────────────────────
@@ -27,10 +27,11 @@ class LeadDiscoveryService:
     ) -> dict:
         """
         Search Apollo.io for people matching criteria.
+        Uses api_search (prospecting) then enriches each person by ID.
 
         Args:
             job_titles: e.g. ["Head of Procurement", "VP Operations", "CEO"]
-            industries: e.g. ["technology", "hospitality", "banking"]
+            industries: e.g. ["technology", "hospitality", "banking"] — used as keywords
             locations: e.g. ["India", "Mumbai", "Delhi NCR"]
             company_sizes: e.g. ["51-200", "201-500", "501-1000"]
             keywords: Free-text search keywords
@@ -41,67 +42,98 @@ class LeadDiscoveryService:
         if not settings.apollo_api_key:
             return {"error": "Apollo API key not configured", "people": [], "total": 0}
 
+        # Normalize company size ranges to Apollo format (e.g. "201-500" → "201,500")
+        apollo_sizes = None
+        if company_sizes:
+            apollo_sizes = [s.replace("-", ",") for s in company_sizes]
+
         payload: dict = {
             "page": page,
             "per_page": min(per_page, 100),
         }
         if job_titles:
             payload["person_titles"] = job_titles
-        if industries:
-            payload["organization_industry_tag_ids"] = industries
         if locations:
             payload["person_locations"] = locations
-        if company_sizes:
-            payload["organization_num_employees_ranges"] = company_sizes
+        if apollo_sizes:
+            payload["organization_num_employees_ranges"] = apollo_sizes
+        # Only use explicit keywords, not industry names (they break Apollo search)
         if keywords:
             payload["q_keywords"] = " ".join(keywords)
 
+        headers = {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "X-Api-Key": settings.apollo_api_key,
+        }
+
         async with httpx.AsyncClient(timeout=30) as client:
+            # Step 1: Search for people (returns obfuscated data + IDs)
             resp = await client.post(
-                f"{self.APOLLO_BASE}/mixed_people/search",
+                f"{self.APOLLO_BASE}/mixed_people/api_search",
                 json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "Cache-Control": "no-cache",
-                    "X-Api-Key": settings.apollo_api_key,
-                },
+                headers=headers,
             )
 
-            if resp.status_code == 200:
-                data = resp.json()
-                people = data.get("people", [])
-                return {
-                    "people": [
-                        {
-                            "first_name": p.get("first_name", ""),
-                            "last_name": p.get("last_name", ""),
-                            "name": p.get("name", ""),
-                            "title": p.get("title", ""),
-                            "email": p.get("email"),
-                            "phone": p.get("phone_numbers", [{}])[0].get("sanitized_number") if p.get("phone_numbers") else None,
-                            "linkedin_url": p.get("linkedin_url"),
-                            "city": p.get("city", ""),
-                            "state": p.get("state", ""),
-                            "country": p.get("country", ""),
-                            "seniority": p.get("seniority", ""),
-                            "departments": p.get("departments", []),
-                            "company": {
-                                "name": p.get("organization", {}).get("name", ""),
-                                "domain": p.get("organization", {}).get("primary_domain", ""),
-                                "industry": p.get("organization", {}).get("industry", ""),
-                                "employee_count": p.get("organization", {}).get("estimated_num_employees"),
-                                "city": p.get("organization", {}).get("city", ""),
-                                "linkedin_url": p.get("organization", {}).get("linkedin_url", ""),
-                            },
-                        }
-                        for p in people
-                    ],
-                    "total": data.get("pagination", {}).get("total_entries", 0),
-                    "page": page,
-                    "per_page": per_page,
-                }
-            else:
+            if resp.status_code != 200:
                 return {"error": resp.text, "people": [], "total": 0}
+
+            data = resp.json()
+            if "error" in data:
+                return {"error": data["error"], "people": [], "total": 0}
+
+            search_people = data.get("people", [])
+            total = data.get("total_entries", 0)
+
+            if not search_people:
+                return {"people": [], "total": 0, "page": page, "per_page": per_page}
+
+            # Step 2: Enrich each person by ID to get full details (email, phone, etc.)
+            enriched_people = []
+            person_ids = [p.get("id") for p in search_people if p.get("id")]
+
+            for person_id in person_ids:
+                try:
+                    enrich_resp = await client.post(
+                        f"{self.APOLLO_BASE}/people/match",
+                        json={"id": person_id, "reveal_personal_emails": False},
+                        headers=headers,
+                    )
+                    if enrich_resp.status_code == 200:
+                        person = enrich_resp.json().get("person", {})
+                        if person:
+                            org = person.get("organization", {}) or {}
+                            enriched_people.append({
+                                "first_name": person.get("first_name", ""),
+                                "last_name": person.get("last_name", ""),
+                                "name": person.get("name", ""),
+                                "title": person.get("title", ""),
+                                "email": person.get("email"),
+                                "phone": person.get("phone_numbers", [{}])[0].get("sanitized_number") if person.get("phone_numbers") else None,
+                                "linkedin_url": person.get("linkedin_url"),
+                                "city": person.get("city", ""),
+                                "state": person.get("state", ""),
+                                "country": person.get("country", ""),
+                                "seniority": person.get("seniority", ""),
+                                "departments": person.get("departments", []),
+                                "company": {
+                                    "name": org.get("name", ""),
+                                    "domain": org.get("primary_domain", ""),
+                                    "industry": org.get("industry", ""),
+                                    "employee_count": org.get("estimated_num_employees"),
+                                    "city": org.get("city", ""),
+                                    "linkedin_url": org.get("linkedin_url", ""),
+                                },
+                            })
+                except Exception:
+                    continue  # Skip failed enrichments
+
+            return {
+                "people": enriched_people,
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+            }
 
     async def search_companies(
         self,

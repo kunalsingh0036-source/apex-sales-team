@@ -91,7 +91,7 @@ export default function MessagesPage() {
       <Header title="Unified Inbox" />
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6 flex-wrap">
+      <div className="flex gap-4 mb-8 flex-wrap">
         <select
           value={filter.direction}
           onChange={(e) => setFilter({ ...filter, direction: e.target.value })}
@@ -133,7 +133,7 @@ export default function MessagesPage() {
 
       {/* Messages list */}
       {!loading && messages.length === 0 && (
-        <div className="bg-white rounded-lg p-12 text-center border border-rich-creme">
+        <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No messages yet</p>
           <p className="text-mid-warm text-sm">
             Messages will appear here as campaigns send outreach and leads reply.
@@ -146,7 +146,7 @@ export default function MessagesPage() {
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`bg-white rounded-lg p-5 border cursor-pointer transition-colors ${
+              className={`bg-white rounded-xl p-6 border cursor-pointer transition-colors ${
                 selectedMessage?.id === msg.id
                   ? "border-crimson"
                   : "border-rich-creme hover:border-crimson/40"
@@ -176,7 +176,7 @@ export default function MessagesPage() {
               </div>
 
               {msg.subject && (
-                <p className="font-bold text-sm text-warm-charcoal mb-1">{msg.subject}</p>
+                <p className="font-bold text-sm text-warm-charcoal mb-1 truncate">{msg.subject}</p>
               )}
               <p className="text-sm text-mid-warm line-clamp-2">{msg.body}</p>
 
@@ -190,8 +190,8 @@ export default function MessagesPage() {
 
       {/* Detail panel */}
       {selectedMessage && (
-        <div className="fixed inset-y-0 right-0 w-[480px] bg-white shadow-xl border-l border-rich-creme z-50 overflow-y-auto">
-          <div className="p-6">
+        <div className="fixed inset-y-0 right-0 w-[520px] max-w-[60vw] bg-white shadow-xl border-l border-rich-creme z-50 overflow-y-auto">
+          <div className="p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-display text-lg font-bold text-crimson-dark">Message Detail</h3>
               <button

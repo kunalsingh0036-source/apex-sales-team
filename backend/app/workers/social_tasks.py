@@ -22,13 +22,13 @@ def send_instagram_dm(message_id: str):
     """Send an Instagram DM."""
     from app.services.social_service import instagram_service
     from app.core.rate_limiter import rate_limiter
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
     from app.models.lead import Lead
     from app.models.activity import Activity
 
     async def _send():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             result = await db.execute(
                 select(Message).where(Message.id == message_id)
             )
@@ -50,12 +50,10 @@ def send_instagram_dm(message_id: str):
                 await db.commit()
                 return {"status": "failed", "reason": "do_not_contact"}
 
-            # Get Instagram recipient ID from lead metadata or social handles
+            # Get Instagram recipient ID from message metadata or lead handle
             recipient_id = (message.extra_data or {}).get("instagram_recipient_id", "")
             if not recipient_id:
-                # Try to find from lead's social handles
-                social = lead.social_handles or {}
-                recipient_id = social.get("instagram_id", "")
+                recipient_id = lead.instagram_handle or ""
 
             if not recipient_id:
                 message.status = "failed"
@@ -118,11 +116,11 @@ def send_instagram_dm(message_id: str):
 @celery_app.task(name="app.workers.social_tasks.process_instagram_queue")
 def process_instagram_queue():
     """Dispatch queued Instagram DMs that are scheduled for now."""
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
 
     async def _process():
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             now = datetime.now(timezone.utc)
             result = await db.execute(
                 select(Message)
@@ -147,14 +145,14 @@ def process_instagram_queue():
 def process_instagram_webhook(payload: dict):
     """Process an incoming Instagram webhook (message received)."""
     from app.services.outreach_orchestrator import orchestrator
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.lead import Lead
 
     async def _process():
         entries = payload.get("entry", [])
         processed = 0
 
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             for entry in entries:
                 messaging = entry.get("messaging", [])
                 for event in messaging:
@@ -165,11 +163,9 @@ def process_instagram_webhook(payload: dict):
                     if not sender_id or not msg_text:
                         continue
 
-                    # Find lead by Instagram ID in social_handles
+                    # Find lead by Instagram handle
                     lead_result = await db.execute(
-                        select(Lead).where(
-                            Lead.social_handles["instagram_id"].astext == sender_id
-                        )
+                        select(Lead).where(Lead.instagram_handle == sender_id)
                     )
                     lead = lead_result.scalar_one_or_none()
                     if not lead:

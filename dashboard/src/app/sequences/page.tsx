@@ -107,6 +107,25 @@ export default function SequencesPage() {
     }
   }
 
+  async function handleDeleteSequence(id: string, name: string) {
+    if (!confirm(`Delete sequence "${name}"? This cannot be undone.`)) return;
+    try {
+      await api.sequences.delete(id);
+      fetchSequences();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    }
+  }
+
+  async function handleToggleActive(seq: SequenceItem) {
+    try {
+      await api.sequences.update(seq.id, { is_active: !seq.is_active });
+      fetchSequences();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    }
+  }
+
   const stepTypeLabels: Record<string, string> = {
     cold_intro: "Cold Intro",
     follow_up_1: "Follow-up 1",
@@ -130,7 +149,7 @@ export default function SequencesPage() {
       </div>
 
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="mb-6 bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Create Sequence
           </h3>
@@ -188,7 +207,7 @@ export default function SequencesPage() {
       )}
 
       {!loading && sequences.length === 0 && (
-        <div className="bg-white rounded-lg p-12 text-center border border-rich-creme">
+        <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No sequences yet</p>
           <p className="text-mid-warm text-sm">
             Create your first outreach sequence to start automating sales.
@@ -201,7 +220,7 @@ export default function SequencesPage() {
           {sequences.map((seq) => (
             <div
               key={seq.id}
-              className="bg-white rounded-lg p-6 border border-rich-creme"
+              className="bg-white rounded-xl p-7 border border-rich-creme"
             >
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -227,7 +246,7 @@ export default function SequencesPage() {
               <div className="flex items-center gap-2 mt-4">
                 {seq.steps.map((step: any, i: number) => (
                   <div key={i} className="flex items-center gap-2">
-                    <div className="px-3 py-1.5 bg-creme rounded text-xs text-warm-charcoal">
+                    <div className="px-3.5 py-2 bg-creme rounded text-xs text-warm-charcoal">
                       <span className="font-bold">
                         {stepTypeLabels[step.type] || step.type}
                       </span>
@@ -242,13 +261,30 @@ export default function SequencesPage() {
                 ))}
               </div>
 
-              <div className="flex gap-2 mt-4">
+              <div className="flex items-center gap-2 mt-4">
+                <Link href={`/sequences/${seq.id}`}>
+                  <Button variant="outline" size="sm">Edit Steps</Button>
+                </Link>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleDuplicate(seq.id)}
                 >
                   Duplicate
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleToggleActive(seq)}
+                >
+                  {seq.is_active ? "Deactivate" : "Activate"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteSequence(seq.id, seq.name)}
+                >
+                  Delete
                 </Button>
                 {seq.target_industry && (
                   <Badge variant="default">{seq.target_industry}</Badge>

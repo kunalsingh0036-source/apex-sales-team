@@ -149,7 +149,7 @@ export default function SequenceDetailPage() {
       )}
 
       {/* Visual pipeline */}
-      <div className="bg-white rounded-lg p-6 border border-rich-creme mb-6">
+      <div className="bg-white rounded-xl p-6 border border-rich-creme mb-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase">
             Sequence Steps ({steps.length})
@@ -167,9 +167,9 @@ export default function SequenceDetailPage() {
         </div>
 
         {/* Step flow visualization */}
-        <div className="flex items-center gap-1 mb-6 flex-wrap">
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
           {steps.map((step, i) => (
-            <div key={i} className="flex items-center gap-1">
+            <div key={i} className="flex items-center gap-2">
               <button
                 onClick={() => setEditingStep(editingStep === i ? null : i)}
                 className={`px-3 py-2 rounded text-xs transition-all ${
@@ -199,7 +199,7 @@ export default function SequenceDetailPage() {
 
         {/* Step editor */}
         {editingStep !== null && steps[editingStep] && (
-          <div className="border border-rich-creme rounded-lg p-5 bg-creme/30">
+          <div className="border border-rich-creme rounded-lg p-6 bg-creme/30">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-display font-bold text-crimson-dark">
                 Step {editingStep + 1}
@@ -379,7 +379,7 @@ export default function SequenceDetailPage() {
 
       {/* Sequence info */}
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-7 border border-rich-creme">
           <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Details</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -405,7 +405,7 @@ export default function SequenceDetailPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-rich-creme">
+        <div className="bg-white rounded-xl p-7 border border-rich-creme">
           <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Channels Used</h3>
           <div className="flex flex-wrap gap-2">
             {[...new Set(steps.map((s) => s.channel))].map((ch) => (

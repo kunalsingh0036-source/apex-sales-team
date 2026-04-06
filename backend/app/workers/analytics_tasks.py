@@ -23,7 +23,7 @@ def daily_rollup(target_date: str | None = None):
     Aggregate daily metrics from messages table into daily_metrics.
     Runs at 11:55 PM IST via Celery Beat.
     """
-    from app.dependencies import async_session
+    from app.dependencies import create_worker_session
     from app.models.message import Message
     from app.models.analytics import DailyMetric
 
@@ -34,7 +34,7 @@ def daily_rollup(target_date: str | None = None):
         day_start = datetime.combine(rollup_date, datetime.min.time()).replace(tzinfo=timezone.utc)
         day_end = day_start + timedelta(days=1)
 
-        async with async_session() as db:
+        async with create_worker_session()() as db:
             # Get metrics grouped by channel and campaign
             result = await db.execute(
                 select(

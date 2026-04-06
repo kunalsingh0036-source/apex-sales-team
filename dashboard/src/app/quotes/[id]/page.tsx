@@ -70,7 +70,7 @@ export default function QuoteDetailPage() {
       <Header title={quote.quote_number} />
 
       {/* Quote Header */}
-      <div className="bg-white rounded-lg border border-rich-creme p-6 mb-6">
+      <div className="bg-white rounded-xl border border-rich-creme p-7 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className={clsx("inline-flex items-center px-3 py-1 rounded-full text-sm font-bold", QUOTE_STATUS_COLORS[quote.status])}>
@@ -116,7 +116,7 @@ export default function QuoteDetailPage() {
       <div className="grid grid-cols-3 gap-6">
         {/* Line Items */}
         <div className="col-span-2">
-          <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+          <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
             <div className="px-4 py-3 bg-creme/30 border-b border-rich-creme">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase">Line Items</h4>
             </div>
@@ -160,7 +160,7 @@ export default function QuoteDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-4">
             <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Details</h4>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -183,14 +183,14 @@ export default function QuoteDetailPage() {
           </div>
 
           {quote.notes && (
-            <div className="bg-white rounded-lg border border-rich-creme p-4">
+            <div className="bg-white rounded-xl border border-rich-creme p-4">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Notes</h4>
               <p className="text-sm text-warm-charcoal whitespace-pre-line">{quote.notes}</p>
             </div>
           )}
 
           {quote.terms_and_conditions && (
-            <div className="bg-white rounded-lg border border-rich-creme p-4">
+            <div className="bg-white rounded-xl border border-rich-creme p-4">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Terms & Conditions</h4>
               <p className="text-xs text-warm-charcoal whitespace-pre-line">{quote.terms_and_conditions}</p>
             </div>

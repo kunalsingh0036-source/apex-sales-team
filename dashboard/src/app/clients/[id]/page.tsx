@@ -91,7 +91,7 @@ export default function ClientDetailPage() {
       <Header title={client.primary_contact_name} />
 
       {/* Client Header Card */}
-      <div className="bg-white rounded-lg border border-rich-creme p-6 mb-6">
+      <div className="bg-white rounded-xl border border-rich-creme p-6 mb-6">
         <div className="flex items-start justify-between">
           <div>
             <h3 className="font-display text-xl font-bold text-crimson-dark">
@@ -118,20 +118,20 @@ export default function ClientDetailPage() {
 
       {/* Revenue Summary */}
       {revenue && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="grid grid-cols-4 gap-5 mb-6">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Orders</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{revenue.total_orders}</p>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Spend</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{formatCurrency(revenue.total_spend)}</p>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">AMA Commitment</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{formatCurrency(revenue.ama_commitment)}</p>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">AMA Utilization</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{revenue.ama_utilization}%</p>
           </div>
@@ -146,7 +146,7 @@ export default function ClientDetailPage() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={clsx(
-                "px-4 py-3 text-sm font-bold border-b-2 transition-colors -mb-px",
+                "px-5 py-3.5 text-sm font-bold border-b-2 transition-colors -mb-px",
                 activeTab === tab.key
                   ? "border-crimson text-crimson"
                   : "border-transparent text-mid-warm hover:text-warm-charcoal"
@@ -161,7 +161,7 @@ export default function ClientDetailPage() {
       {/* Tab Content */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg border border-rich-creme p-6">
+          <div className="bg-white rounded-xl border border-rich-creme p-6">
             <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-4">Details</h4>
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
@@ -184,7 +184,7 @@ export default function ClientDetailPage() {
               )}
             </dl>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-6">
+          <div className="bg-white rounded-xl border border-rich-creme p-6">
             <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-4">Addresses</h4>
             <div className="space-y-4 text-sm">
               <div>
@@ -198,7 +198,7 @@ export default function ClientDetailPage() {
             </div>
           </div>
           {client.notes && (
-            <div className="col-span-2 bg-white rounded-lg border border-rich-creme p-6">
+            <div className="col-span-2 bg-white rounded-xl border border-rich-creme p-6">
               <h4 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-4">Notes</h4>
               <p className="text-sm text-warm-charcoal whitespace-pre-line">{client.notes}</p>
             </div>
@@ -207,7 +207,7 @@ export default function ClientDetailPage() {
       )}
 
       {activeTab === "contacts" && (
-        <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+        <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rich-creme bg-creme/30">
@@ -240,7 +240,7 @@ export default function ClientDetailPage() {
           {interactions.length === 0 ? (
             <p className="text-mid-warm text-center py-8">No interactions recorded</p>
           ) : interactions.map((i) => (
-            <div key={i.id} className="bg-white rounded-lg border border-rich-creme p-4">
+            <div key={i.id} className="bg-white rounded-xl border border-rich-creme p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export default function ClientDetailPage() {
           {brandAssets.length === 0 ? (
             <p className="col-span-3 text-mid-warm text-center py-8">No brand assets</p>
           ) : brandAssets.map((a) => (
-            <div key={a.id} className="bg-white rounded-lg border border-rich-creme p-4">
+            <div key={a.id} className="bg-white rounded-xl border border-rich-creme p-4">
               <Badge>{a.asset_type}</Badge>
               <p className="font-bold text-sm text-warm-charcoal mt-2">{a.name}</p>
               {a.value && <p className="text-sm text-mid-warm mt-1">{a.value}</p>}
@@ -281,7 +281,7 @@ export default function ClientDetailPage() {
           {sampleKits.length === 0 ? (
             <p className="text-mid-warm text-center py-8">No sample kits</p>
           ) : sampleKits.map((kit) => (
-            <div key={kit.id} className="bg-white rounded-lg border border-rich-creme p-4">
+            <div key={kit.id} className="bg-white rounded-xl border border-rich-creme p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-bold text-sm text-warm-charcoal">{kit.kit_name}</span>

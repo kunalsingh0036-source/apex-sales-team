@@ -83,11 +83,11 @@ export default function LeadDetailPage() {
         </h2>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-8">
         {/* Main Info */}
         <div className="col-span-2 space-y-6">
           {/* Contact Card */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-7 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-4">
               Contact Information
             </h3>
@@ -141,7 +141,7 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Professional Info */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-7 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-4">
               Professional Details
             </h3>
@@ -188,7 +188,7 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Timeline */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-7 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-4">
               Activity Timeline
             </h3>
@@ -221,11 +221,11 @@ export default function LeadDetailPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Score */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme text-center">
+          <div className="bg-white rounded-xl p-8 border border-rich-creme text-center">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
               Lead Score
             </h3>
-            <div className="font-display text-5xl font-bold text-crimson-dark">
+            <div className="font-display text-6xl font-bold text-crimson-dark">
               {lead.lead_score}
             </div>
             <p className="text-xs text-mid-warm mt-1">out of 100</p>
@@ -244,7 +244,7 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Stage */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-6 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
               Pipeline Stage
             </h3>
@@ -270,7 +270,7 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Tags */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-6 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
               Tags
             </h3>
@@ -288,7 +288,7 @@ export default function LeadDetailPage() {
           </div>
 
           {/* Meta */}
-          <div className="bg-white rounded-lg p-6 border border-rich-creme">
+          <div className="bg-white rounded-xl p-6 border border-rich-creme">
             <h3 className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase mb-3">
               Details
             </h3>

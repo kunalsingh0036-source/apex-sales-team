@@ -63,62 +63,78 @@ class OutreachOrchestrator:
                 return False
 
         # Determine message content (A/B variant selection)
-        variant = "A"
+        variant = "A" if hash(str(enrollment.id)) % 2 == 0 else "B"
         subject_variants = step.get("subject_variants", [])
         body_variants = step.get("body_variants", [])
-
-        if subject_variants and body_variants:
-            # Simple A/B: alternate based on enrollment ID hash
-            variant = "A" if hash(str(enrollment.id)) % 2 == 0 else "B"
 
         subject = None
         body = ""
 
-        if subject_variants:
+        # Handle both dict format {"A": "...", "B": "..."} and list format ["...", "..."]
+        if isinstance(subject_variants, dict):
+            subject = subject_variants.get(variant) or subject_variants.get("A")
+        elif isinstance(subject_variants, list) and subject_variants:
             idx = 0 if variant == "A" else min(1, len(subject_variants) - 1)
             subject = subject_variants[idx]
-        if body_variants:
+
+        if isinstance(body_variants, dict):
+            body = body_variants.get(variant) or body_variants.get("A") or ""
+        elif isinstance(body_variants, list) and body_variants:
             idx = 0 if variant == "A" else min(1, len(body_variants) - 1)
             body = body_variants[idx]
 
-        # If no variants, generate with AI
-        if not body:
-            company_name = ""
-            industry = "Other"
-            if lead.company_id:
-                from app.models.lead import Company
-                comp_result = await db.execute(
-                    select(Company).where(Company.id == lead.company_id)
-                )
-                company = comp_result.scalar_one_or_none()
-                if company:
-                    company_name = company.name
-                    industry = company.industry
-
-            message_type = step.get("type", "cold_intro")
-            ai_result = await ai_engine.generate_outreach_message(
-                lead_name=lead.full_name,
-                lead_title=lead.job_title,
-                lead_company=company_name,
-                lead_industry=industry,
-                channel=channel,
-                message_type=message_type,
+        # Load company info (needed for AI generation and template rendering)
+        company_name = ""
+        industry = "Other"
+        if lead.company_id:
+            from app.models.lead import Company
+            comp_result = await db.execute(
+                select(Company).where(Company.id == lead.company_id)
             )
-            subject = ai_result.get("subject")
-            body = ai_result.get("body", "")
+            company = comp_result.scalar_one_or_none()
+            if company:
+                company_name = company.name
+                industry = company.industry or "Other"
 
         # Apply template variables if body contains {{placeholders}}
-        if "{{" in body:
+        if body and "{{" in body:
             variables = {
                 "first_name": lead.first_name,
                 "last_name": lead.last_name,
                 "full_name": lead.full_name,
                 "job_title": lead.job_title,
-                "company_name": company_name if "company_name" in body else "",
+                "company_name": company_name,
             }
             body = render_template(body, variables)
             if subject and "{{" in subject:
                 subject = render_template(subject, variables)
+
+        # Always AI-personalize if content is missing, generic, or from a
+        # fallback template.  The sequence template is treated as a hint
+        # (via message_type), not as final copy.
+        is_fallback = step.get("is_fallback", False)
+        needs_ai = (
+            not body
+            or is_fallback
+            or len(body.strip()) < 100
+        )
+        if needs_ai:
+            message_type = step.get("type", "cold_intro")
+            try:
+                ai_result = await ai_engine.generate_outreach_message(
+                    lead_name=lead.full_name,
+                    lead_title=lead.job_title,
+                    lead_company=company_name,
+                    lead_industry=industry,
+                    channel=channel,
+                    message_type=message_type,
+                )
+                ai_body = ai_result.get("body", "")
+                if ai_body and len(ai_body.strip()) > len(body.strip()):
+                    body = ai_body
+                    subject = ai_result.get("subject") or subject
+            except Exception:
+                pass  # keep whatever template content we have
 
         # Create the message
         message = Message(
@@ -129,7 +145,7 @@ class OutreachOrchestrator:
             direction="outbound",
             subject=subject,
             body=body,
-            status="queued",
+            status="content_review",
             variant=variant,
             scheduled_at=enrollment.next_step_at or datetime.now(timezone.utc),
         )

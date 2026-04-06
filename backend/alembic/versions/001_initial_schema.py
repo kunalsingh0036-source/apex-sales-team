@@ -1,4 +1,4 @@
-"""Initial database schema — all tables for Apex Outreach Agent.
+"""Initial database schema — all tables for Apex Sales Agent.
 
 Revision ID: 001_initial
 Revises:

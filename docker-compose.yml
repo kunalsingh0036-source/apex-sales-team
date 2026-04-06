@@ -49,7 +49,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend/app:/app/app
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q email,linkedin,whatsapp,social,ai,enrichment,analytics,celery
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q email,linkedin,whatsapp,social,ai,enrichment,analytics,automation,celery
 
   celery-beat:
     build: ./backend

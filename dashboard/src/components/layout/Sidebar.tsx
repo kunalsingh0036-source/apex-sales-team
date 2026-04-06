@@ -12,6 +12,7 @@ const outreachItems = [
   { href: "/sequences", label: "Sequences", icon: "⟳" },
   { href: "/messages", label: "Messages", icon: "✉" },
   { href: "/analytics", label: "Analytics", icon: "◈" },
+  { href: "/autopilot", label: "Autopilot", icon: "⚡" },
 ];
 
 const crmItems = [
@@ -35,7 +36,7 @@ export default function Sidebar() {
           THE APEX HUMAN
         </h1>
         <p className="font-label text-xs tracking-[0.2em] mt-1 text-rich-creme opacity-80 uppercase">
-          Outreach Agent
+          Sales Agent
         </p>
       </div>
 

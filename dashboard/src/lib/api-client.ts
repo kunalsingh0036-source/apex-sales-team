@@ -130,6 +130,8 @@ export const api = {
         method: "PUT",
         body: JSON.stringify({ status }),
       }),
+    delete: (id: string) =>
+      request<any>(`/campaigns/${id}`, { method: "DELETE" }),
     enroll: (id: string, leadIds: string[]) =>
       request<any>(`/campaigns/${id}/enroll`, {
         method: "POST",
@@ -330,6 +332,23 @@ export const api = {
       request<any>(`/revenue/monthly-trends${months ? `?months=${months}` : ""}`),
     pipelineValue: () => request<any>("/revenue/pipeline-value"),
     amaOverview: () => request<any>("/revenue/ama-overview"),
+  },
+
+  // Autopilot
+  autopilot: {
+    status: () => request<any>("/automation/status"),
+    toggle: (enabled: boolean) =>
+      request<any>("/automation/toggle", { method: "PUT", body: JSON.stringify({ enabled }) }),
+    getIcp: () => request<any>("/automation/icp"),
+    updateIcp: (data: any) =>
+      request<any>("/automation/icp", { method: "PUT", body: JSON.stringify(data) }),
+    history: (limit?: number) =>
+      request<any>(`/automation/history${limit ? `?limit=${limit}` : ""}`),
+    trigger: (stage: string) =>
+      request<any>(`/automation/trigger/${stage}`, { method: "POST" }),
+    getSettings: () => request<any>("/automation/settings"),
+    updateSettings: (data: any) =>
+      request<any>("/automation/settings", { method: "PUT", body: JSON.stringify(data) }),
   },
 
   // Analytics

@@ -64,16 +64,16 @@ export default function OrdersPage() {
 
       {/* Pipeline Summary */}
       {pipeline && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="grid grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Orders</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{pipeline.total_orders}</p>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-4">
+          <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Pipeline Value</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{formatCurrency(pipeline.total_pipeline_value)}</p>
           </div>
-          <div className="bg-white rounded-lg border border-rich-creme p-4 col-span-2">
+          <div className="bg-white rounded-xl border border-rich-creme p-5 col-span-2">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-2">By Stage</p>
             <div className="flex gap-2 flex-wrap">
               {(pipeline.stages || []).map((s: any) => (
@@ -133,16 +133,16 @@ export default function OrdersPage() {
         /* Kanban View */
         <div className="flex gap-3 overflow-x-auto pb-4">
           {ALL_STAGES.map((stage) => (
-            <div key={stage} className="min-w-[220px] flex-1">
-              <div className={clsx("rounded-t-lg px-3 py-2 text-xs font-bold", ORDER_STAGE_COLORS[stage])}>
+            <div key={stage} className="min-w-[240px] flex-1">
+              <div className={clsx("rounded-t-xl px-3 py-2 text-xs font-bold", ORDER_STAGE_COLORS[stage])}>
                 {ORDER_STAGE_LABELS[stage]} ({ordersByStage[stage].length})
               </div>
-              <div className="bg-gray-50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
+              <div className="bg-gray-50 rounded-b-xl p-2 space-y-2 min-h-[200px]">
                 {ordersByStage[stage].map((order) => (
                   <Link
                     key={order.id}
                     href={`/orders/${order.id}`}
-                    className="block bg-white rounded border border-rich-creme p-3 hover:shadow transition-shadow"
+                    className="block bg-white rounded border border-rich-creme p-4 hover:shadow transition-shadow"
                   >
                     <p className="font-bold text-xs text-crimson-dark">{order.order_number}</p>
                     <p className="text-xs text-mid-warm mt-1">{formatCurrency(order.total_amount)}</p>
@@ -159,7 +159,7 @@ export default function OrdersPage() {
         </div>
       ) : (
         /* Table View */
-        <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+        <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-rich-creme bg-creme/30">

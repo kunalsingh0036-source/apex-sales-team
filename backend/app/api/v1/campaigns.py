@@ -109,8 +109,10 @@ async def update_campaign_status(
             detail=f"Invalid status. Must be one of: {valid_statuses}",
         )
 
-    if data.status == "active" and campaign.status == "draft":
-        campaign.started_at = datetime.now(timezone.utc)
+    if data.status == "active" and campaign.status in ("draft", "paused", "completed"):
+        if not campaign.started_at:
+            campaign.started_at = datetime.now(timezone.utc)
+        campaign.completed_at = None  # Clear completed timestamp on reactivation
     elif data.status == "completed":
         campaign.completed_at = datetime.now(timezone.utc)
 
@@ -121,6 +123,32 @@ async def update_campaign_status(
     await db.commit()
     await db.refresh(campaign)
     return CampaignResponse.model_validate(campaign)
+
+
+@router.delete("/{campaign_id}")
+async def delete_campaign(campaign_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a campaign and all its enrollments."""
+    result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = result.scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if campaign.status == "active":
+        raise HTTPException(status_code=400, detail="Cannot delete an active campaign. Pause or complete it first.")
+
+    # Delete enrollments first
+    await db.execute(
+        select(CampaignEnrollment).where(CampaignEnrollment.campaign_id == campaign_id)
+    )
+    enrollments = (await db.execute(
+        select(CampaignEnrollment).where(CampaignEnrollment.campaign_id == campaign_id)
+    )).scalars().all()
+    for enrollment in enrollments:
+        await db.delete(enrollment)
+
+    await db.delete(campaign)
+    await db.commit()
+    return {"message": "Campaign deleted", "id": str(campaign_id)}
 
 
 @router.post("/{campaign_id}/enroll", status_code=201)
@@ -216,8 +244,9 @@ async def list_enrollments(
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(CampaignEnrollment).where(
-        CampaignEnrollment.campaign_id == campaign_id
+    query = (
+        select(CampaignEnrollment)
+        .where(CampaignEnrollment.campaign_id == campaign_id)
     )
     count_query = select(func.count()).select_from(CampaignEnrollment).where(
         CampaignEnrollment.campaign_id == campaign_id
@@ -233,8 +262,32 @@ async def list_enrollments(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    # Load lead details for each enrollment
+    from app.schemas.sequence import EnrollmentLeadSummary
+    enriched = []
+    for e in items:
+        lead_result = await db.execute(
+            select(Lead)
+            .options(selectinload(Lead.company))
+            .where(Lead.id == e.lead_id)
+        )
+        lead = lead_result.scalar_one_or_none()
+
+        resp = EnrollmentResponse.model_validate(e)
+        if lead:
+            resp.lead = EnrollmentLeadSummary(
+                id=lead.id,
+                full_name=lead.full_name,
+                email=lead.email,
+                job_title=lead.job_title,
+                company_name=lead.company.name if lead.company else None,
+                lead_score=lead.lead_score,
+                stage=lead.stage,
+            )
+        enriched.append(resp)
+
     return PaginatedResponse(
-        items=[EnrollmentResponse.model_validate(e) for e in items],
+        items=enriched,
         total=total,
         page=page,
         per_page=per_page,

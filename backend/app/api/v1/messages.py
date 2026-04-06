@@ -8,7 +8,10 @@ from app.dependencies import get_db
 from app.models.message import Message
 from app.models.lead import Lead
 from app.models.activity import Activity
-from app.schemas.message import MessageResponse, SendMessageRequest, GenerateMessageRequest
+from app.schemas.message import (
+    MessageResponse, SendMessageRequest, GenerateMessageRequest,
+    ApproveBatchRequest, RegenerateRequest,
+)
 from app.schemas.common import PaginatedResponse
 from app.services.ai_engine import ai_engine
 from app.services.email_service import gmail_service
@@ -76,6 +79,27 @@ async def pending_replies(db: AsyncSession = Depends(get_db)):
     )
     items = result.scalars().all()
     return [MessageResponse.model_validate(m) for m in items]
+
+
+@router.post("/retry-failed")
+async def retry_failed_messages(db: AsyncSession = Depends(get_db)):
+    """Re-queue all failed outbound email messages for retry."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Message).where(
+            Message.status == "failed",
+            Message.direction == "outbound",
+            Message.channel == "email",
+        )
+    )
+    messages = result.scalars().all()
+    count = 0
+    for msg in messages:
+        msg.status = "queued"
+        msg.scheduled_at = now
+        count += 1
+    await db.commit()
+    return {"requeued": count}
 
 
 @router.post("/send", response_model=MessageResponse, status_code=201)
@@ -178,6 +202,163 @@ async def generate_message(data: GenerateMessageRequest, db: AsyncSession = Depe
         "notes": result.get("notes", ""),
         "lead": {"id": str(lead.id), "name": lead.full_name},
     }
+
+
+@router.post("/{message_id}/approve")
+async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Approve a content_review message and send it."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.status != "content_review":
+        raise HTTPException(status_code=400, detail=f"Message is {message.status}, not content_review")
+
+    lead_result = await db.execute(select(Lead).where(Lead.id == message.lead_id))
+    lead = lead_result.scalar_one_or_none()
+    if not lead or not lead.email:
+        raise HTTPException(status_code=400, detail="Lead has no email")
+    if lead.do_not_contact:
+        raise HTTPException(status_code=400, detail="Lead is do_not_contact")
+
+    can_send = await rate_limiter.can_send("email")
+    if not can_send:
+        raise HTTPException(status_code=429, detail="Email daily limit reached")
+
+    try:
+        gmail_result = await gmail_service.send_email(
+            to=lead.email,
+            subject=message.subject or "The Apex Human Company",
+            body=message.body,
+        )
+        message.status = "sent"
+        message.sent_at = datetime.now(timezone.utc)
+        message.external_id = gmail_result.get("message_id")
+        await rate_limiter.record_send("email")
+
+        activity = Activity(
+            lead_id=lead.id,
+            type="email_sent",
+            channel="email",
+            description=f"Email approved and sent: {message.subject or message.body[:60]}",
+        )
+        db.add(activity)
+        await db.commit()
+        return {"status": "sent", "gmail_id": gmail_result.get("message_id")}
+    except Exception as e:
+        message.status = "failed"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/approve-batch")
+async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(get_db)):
+    """Approve and send multiple content_review messages."""
+    results = []
+    for mid in data.message_ids:
+        result = await db.execute(select(Message).where(Message.id == mid))
+        message = result.scalar_one_or_none()
+        if not message or message.status != "content_review":
+            results.append({"id": str(mid), "status": "skipped", "reason": "not in content_review"})
+            continue
+
+        lead_result = await db.execute(select(Lead).where(Lead.id == message.lead_id))
+        lead = lead_result.scalar_one_or_none()
+        if not lead or not lead.email:
+            results.append({"id": str(mid), "status": "skipped", "reason": "no email"})
+            continue
+
+        can_send = await rate_limiter.can_send("email")
+        if not can_send:
+            results.append({"id": str(mid), "status": "rate_limited"})
+            continue
+
+        try:
+            gmail_result = await gmail_service.send_email(
+                to=lead.email,
+                subject=message.subject or "The Apex Human Company",
+                body=message.body,
+            )
+            message.status = "sent"
+            message.sent_at = datetime.now(timezone.utc)
+            message.external_id = gmail_result.get("message_id")
+            await rate_limiter.record_send("email")
+
+            activity = Activity(
+                lead_id=lead.id,
+                type="email_sent",
+                channel="email",
+                description=f"Email approved and sent: {message.subject or message.body[:60]}",
+            )
+            db.add(activity)
+            results.append({"id": str(mid), "status": "sent"})
+        except Exception as e:
+            message.status = "failed"
+            results.append({"id": str(mid), "status": "failed", "error": str(e)})
+
+    await db.commit()
+    sent_count = sum(1 for r in results if r["status"] == "sent")
+    return {"results": results, "sent": sent_count, "total": len(data.message_ids)}
+
+
+@router.post("/{message_id}/reject")
+async def reject_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Reject a content_review message. Sets status to draft."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.status != "content_review":
+        raise HTTPException(status_code=400, detail=f"Message is {message.status}, not content_review")
+
+    message.status = "draft"
+    await db.commit()
+    return {"status": "rejected", "message_id": str(message_id)}
+
+
+@router.post("/{message_id}/regenerate")
+async def regenerate_message(
+    message_id: uuid.UUID,
+    data: RegenerateRequest = RegenerateRequest(),
+    db: AsyncSession = Depends(get_db),
+):
+    """Regenerate message content using AI. Keeps status as content_review."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.status not in ("content_review", "draft"):
+        raise HTTPException(status_code=400, detail=f"Message is {message.status}, cannot regenerate")
+
+    lead_result = await db.execute(
+        select(Lead).options(selectinload(Lead.company)).where(Lead.id == message.lead_id)
+    )
+    lead = lead_result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    company_name = lead.company.name if lead.company else ""
+    industry = lead.company.industry if lead.company else "Other"
+
+    ai_result = await ai_engine.generate_outreach_message(
+        lead_name=lead.full_name,
+        lead_title=lead.job_title or "",
+        lead_company=company_name,
+        lead_industry=industry,
+        channel=message.channel,
+        message_type="follow_up_1",
+        custom_instructions=data.custom_instructions,
+    )
+
+    body = ai_result.get("body", "")
+    if body and len(body.strip()) > 50:
+        message.body = body
+        message.subject = ai_result.get("subject") or message.subject
+        message.status = "content_review"
+        await db.commit()
+        return {"status": "regenerated", "subject": message.subject, "body": message.body}
+    else:
+        raise HTTPException(status_code=500, detail="AI generation returned insufficient content")
 
 
 @router.get("/{message_id}", response_model=MessageResponse)

@@ -44,24 +44,24 @@ export default function QuotesPage() {
       <Header title="Quotes" />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+      <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Quotes</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>
         </div>
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Draft</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">
             {quotes.filter((q) => q.status === "draft").length}
           </p>
         </div>
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Pending</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">
             {quotes.filter((q) => ["sent", "viewed"].includes(q.status)).length}
           </p>
         </div>
-        <div className="bg-white rounded-lg border border-rich-creme p-4">
+        <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Accepted</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">
             {quotes.filter((q) => q.status === "accepted").length}
@@ -88,7 +88,7 @@ export default function QuotesPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+      <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-rich-creme bg-creme/30">
