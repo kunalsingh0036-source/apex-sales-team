@@ -20,8 +20,11 @@ if os.path.exists(env_file):
 config = context.config
 
 # Override sqlalchemy.url from environment if available
-db_url = os.environ.get("DATABASE_URL_SYNC")
+db_url = os.environ.get("DATABASE_URL_SYNC") or os.environ.get("DATABASE_URL")
 if db_url:
+    # Ensure sync driver (strip asyncpg/aiopg if present)
+    db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    db_url = db_url.replace("postgresql+aiopg://", "postgresql://")
     config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:

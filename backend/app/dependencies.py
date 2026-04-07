@@ -7,7 +7,7 @@ from app.config import get_settings
 settings = get_settings()
 
 # FastAPI engine (shared, long-lived — bound to the main event loop)
-engine = create_async_engine(settings.database_url, echo=False, pool_size=10)
+engine = create_async_engine(settings.async_database_url, echo=False, pool_size=10)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -26,7 +26,7 @@ def create_worker_session() -> async_sessionmaker:
     Uses pool_size=1 and NullPool to minimize connections."""
     from sqlalchemy.pool import NullPool
     worker_engine = create_async_engine(
-        settings.database_url, echo=False, poolclass=NullPool,
+        settings.async_database_url, echo=False, poolclass=NullPool,
     )
     return async_sessionmaker(worker_engine, expire_on_commit=False)
 

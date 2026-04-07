@@ -11,7 +11,25 @@ load_dotenv(_ENV_FILE, override=True)
 class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://apex:apex_dev_password@localhost:5432/apex_outreach"
-    database_url_sync: str = "postgresql://apex:apex_dev_password@localhost:5432/apex_outreach"
+    database_url_sync: str = ""
+
+    @property
+    def sync_database_url(self) -> str:
+        """Derive sync URL from async URL or use explicit override."""
+        if self.database_url_sync:
+            return self.database_url_sync
+        url = self.database_url
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
+        url = url.replace("postgresql+aiopg://", "postgresql://")
+        return url
+
+    @property
+    def async_database_url(self) -> str:
+        """Ensure database_url uses asyncpg driver."""
+        url = self.database_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
