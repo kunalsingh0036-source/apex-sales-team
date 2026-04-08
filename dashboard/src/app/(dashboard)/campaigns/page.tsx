@@ -17,30 +17,19 @@ interface CampaignItem {
   created_at: string;
 }
 
-interface SequenceOption {
-  id: string;
-  name: string;
-  channel: string;
-}
-
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
-  const [sequences, setSequences] = useState<SequenceOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", sequence_id: "" });
+  const [form, setForm] = useState({ name: "" });
 
   const [generating, setGenerating] = useState(false);
 
   async function fetchData() {
     setLoading(true);
     try {
-      const [campaignData, seqData] = await Promise.all([
-        api.campaigns.list(),
-        api.sequences.list(),
-      ]);
+      const campaignData = await api.campaigns.list();
       setCampaigns(campaignData.items);
-      setSequences(seqData.items);
     } catch (err) {
       console.error(err);
     } finally {
@@ -55,12 +44,9 @@ export default function CampaignsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api.campaigns.create({
-        name: form.name,
-        sequence_id: form.sequence_id,
-      });
+      await api.campaigns.create({ name: form.name });
       setShowCreate(false);
-      setForm({ name: "", sequence_id: "" });
+      setForm({ name: "" });
       fetchData();
     } catch (err: any) {
       alert("Failed: " + err.message);
@@ -137,26 +123,11 @@ export default function CampaignsPage() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full px-3 py-2 border border-rich-creme rounded text-sm"
             />
-            <select
-              required
-              value={form.sequence_id}
-              onChange={(e) => setForm({ ...form, sequence_id: e.target.value })}
-              className="w-full px-3 py-2 border border-rich-creme rounded text-sm"
-            >
-              <option value="">Select a sequence *</option>
-              {sequences.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.channel})
-                </option>
-              ))}
-            </select>
-            {sequences.length === 0 && (
-              <p className="text-xs text-crimson">
-                No sequences available. <Link href="/sequences" className="underline">Create one first</Link>.
-              </p>
-            )}
+            <p className="text-xs text-mid-warm">
+              The campaign will use the universal email sequence. Each message is AI-generated fresh per lead.
+            </p>
             <div className="flex gap-3">
-              <Button type="submit" size="sm" disabled={!form.sequence_id}>
+              <Button type="submit" size="sm" disabled={!form.name}>
                 Create Campaign
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>
@@ -171,7 +142,7 @@ export default function CampaignsPage() {
         <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No campaigns yet</p>
           <p className="text-mid-warm text-sm">
-            Create a sequence first, then create a campaign to enroll leads.
+            Click "Create Campaigns" to auto-generate campaigns from your leads, or create one manually.
           </p>
         </div>
       )}
