@@ -16,22 +16,33 @@ GENERIC_PATTERNS = [
     r"reaching out about a potential partnership",
     r"Regarding .+ partnership",
     r"reaching out about a potential collaboration",
+    r"I wanted to reach out",
+    r"I hope this email finds you well",
+    r"just checking in",
+    r"touching base",
 ]
 GENERIC_RE = re.compile("|".join(GENERIC_PATTERNS), re.IGNORECASE)
-MIN_BODY_LENGTH = 50
+PLACEHOLDER_RE = re.compile(r"\{\{.+?\}\}|\[Your [Nn]ame\]|\[Contact\]|\[Company\]|\[Phone\]|\[Email\]|\[Name\]|\[Title\]")
+MIN_BODY_LENGTH = 100
 
 
 def _content_passes_quality(subject: str | None, body: str) -> tuple[bool, str]:
     """Check if message content is good enough to send.
 
+    No generic templates, no placeholders, no bot-like content.
+    If it doesn't pass, it stays in content_review for a human.
     Returns (passes, reason).
     """
     if not body or len(body.strip()) < MIN_BODY_LENGTH:
         return False, f"body too short ({len(body.strip())} chars, min {MIN_BODY_LENGTH})"
     if GENERIC_RE.search(body):
-        return False, "body matches generic placeholder pattern"
+        return False, "body matches generic pattern"
     if subject and GENERIC_RE.search(subject):
-        return False, "subject matches generic placeholder pattern"
+        return False, "subject matches generic pattern"
+    if PLACEHOLDER_RE.search(body):
+        return False, "body contains unresolved placeholders"
+    if subject and PLACEHOLDER_RE.search(subject):
+        return False, "subject contains unresolved placeholders"
     return True, ""
 
 
