@@ -366,6 +366,20 @@ class AutomationEngine:
         result = await db.execute(query)
         leads = result.scalars().all()
 
+        # Contact guard filter
+        from app.services.contact_guard import can_contact
+        filtered_leads = []
+        contact_guard_blocked = 0
+        for lead in leads:
+            allowed, _reason = await can_contact(lead, db)
+            if allowed:
+                filtered_leads.append(lead)
+            else:
+                contact_guard_blocked += 1
+        if contact_guard_blocked:
+            logger.info(f"Contact guard filtered out {contact_guard_blocked} leads from campaign creation")
+        leads = filtered_leads
+
         if not leads:
             r = {"campaigns_created": 0, "leads_enrolled": 0, "reason": "no_eligible_leads"}
             await self._log_run(db, "campaigns", r)

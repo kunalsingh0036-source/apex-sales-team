@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
-from sqlalchemy import String, Text, Integer, Boolean, Numeric, Date, ForeignKey, ARRAY
+from sqlalchemy import String, Text, Integer, Boolean, Numeric, Date, DateTime, ForeignKey, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import Base, UUIDMixin, TimestampMixin
@@ -55,6 +55,7 @@ class Lead(Base, UUIDMixin, TimestampMixin):
     notes: Mapped[str] = mapped_column(Text, default="")
     consent_status: Mapped[str] = mapped_column(String(20), default="unknown")
     do_not_contact: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_contacted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     enrichment_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     assigned_to: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")

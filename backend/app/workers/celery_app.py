@@ -55,6 +55,10 @@ celery_app.conf.update(
             "task": "app.workers.email_tasks.advance_sequences",
             "schedule": crontab(minute="*/10"),  # Every 10 minutes
         },
+        "sync-gmail-sent": {
+            "task": "app.workers.email_tasks.sync_gmail_sent",
+            "schedule": crontab(minute="*/15"),  # Every 15 minutes
+        },
         # LinkedIn queue (slower cadence due to tight limits)
         "process-linkedin-queue": {
             "task": "app.workers.linkedin_tasks.process_linkedin_queue",

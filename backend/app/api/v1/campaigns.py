@@ -194,6 +194,13 @@ async def enroll_leads(
             skipped += 1
             continue
 
+        # Contact guard check
+        from app.services.contact_guard import can_contact
+        allowed, reason = await can_contact(lead, db)
+        if not allowed:
+            skipped += 1
+            continue
+
         # Calculate first step send time
         from app.core.indian_calendar import next_send_window
         next_send = next_send_window()

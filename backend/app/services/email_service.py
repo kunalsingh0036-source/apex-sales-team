@@ -133,4 +133,71 @@ class GmailService:
         return replies
 
 
+    async def get_sent_messages(self, after_timestamp: Optional[str] = None) -> list[dict]:
+        """Fetch sent messages from Gmail.
+
+        Args:
+            after_timestamp: Unix epoch string to filter messages after this time.
+
+        Returns list of dicts with message_id, thread_id, to, subject, body, date.
+        """
+        service = self._get_service()
+
+        query = "from:me"
+        if after_timestamp:
+            query += f" after:{after_timestamp}"
+
+        results = service.users().messages().list(
+            userId="me",
+            q=query,
+            labelIds=["SENT"],
+            maxResults=100,
+        ).execute()
+
+        messages = results.get("messages", [])
+        sent = []
+
+        for msg_ref in messages:
+            msg = service.users().messages().get(
+                userId="me",
+                id=msg_ref["id"],
+                format="full",
+            ).execute()
+
+            headers = {h["name"].lower(): h["value"] for h in msg["payload"]["headers"]}
+
+            # Extract body (same pattern as check_replies)
+            body = ""
+            payload = msg["payload"]
+            if "parts" in payload:
+                for part in payload["parts"]:
+                    if part["mimeType"] == "text/plain":
+                        data = part["body"].get("data", "")
+                        body = base64.urlsafe_b64decode(data).decode("utf-8", errors="replace")
+                        break
+            elif "body" in payload and payload["body"].get("data"):
+                body = base64.urlsafe_b64decode(
+                    payload["body"]["data"]
+                ).decode("utf-8", errors="replace")
+
+            # Extract just the email from "Name <email@domain.com>" format
+            to_raw = headers.get("to", "")
+            if "<" in to_raw:
+                to_email = to_raw.split("<")[1].rstrip(">")
+            else:
+                to_email = to_raw.strip()
+
+            sent.append({
+                "message_id": msg["id"],
+                "thread_id": msg["threadId"],
+                "to": to_email,
+                "to_raw": to_raw,
+                "subject": headers.get("subject", ""),
+                "body": body,
+                "date": headers.get("date", ""),
+            })
+
+        return sent
+
+
 gmail_service = GmailService()

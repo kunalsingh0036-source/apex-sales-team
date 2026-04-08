@@ -116,6 +116,12 @@ async def send_message(data: SendMessageRequest, db: AsyncSession = Depends(get_
     if lead.do_not_contact:
         raise HTTPException(status_code=400, detail="Lead is marked do-not-contact")
 
+    # Contact guard check
+    from app.services.contact_guard import can_contact
+    allowed, reason = await can_contact(lead, db)
+    if not allowed:
+        raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
+
     if data.channel == "email":
         if not lead.email:
             raise HTTPException(status_code=400, detail="Lead has no email address")
@@ -221,6 +227,12 @@ async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_
     if lead.do_not_contact:
         raise HTTPException(status_code=400, detail="Lead is do_not_contact")
 
+    # Contact guard check
+    from app.services.contact_guard import can_contact
+    allowed, reason = await can_contact(lead, db)
+    if not allowed:
+        raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
+
     can_send = await rate_limiter.can_send("email")
     if not can_send:
         raise HTTPException(status_code=429, detail="Email daily limit reached")
@@ -266,6 +278,13 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
         lead = lead_result.scalar_one_or_none()
         if not lead or not lead.email:
             results.append({"id": str(mid), "status": "skipped", "reason": "no email"})
+            continue
+
+        # Contact guard check
+        from app.services.contact_guard import can_contact
+        allowed, reason = await can_contact(lead, db)
+        if not allowed:
+            results.append({"id": str(mid), "status": "blocked", "reason": f"contact_guard: {reason}"})
             continue
 
         can_send = await rate_limiter.can_send("email")

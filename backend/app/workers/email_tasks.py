@@ -77,6 +77,15 @@ def send_email(message_id: str):
                 await db.commit()
                 return {"status": "failed", "reason": "do_not_contact"}
 
+            # Contact guard check
+            from app.services.contact_guard import can_contact
+            allowed, reason = await can_contact(lead, db)
+            if not allowed:
+                message.status = "failed"
+                await db.commit()
+                logger.info(f"Contact guard blocked {lead.email}: {reason}")
+                return {"status": "failed", "reason": f"contact_guard: {reason}"}
+
             # Content quality gate — reject generic/placeholder messages
             passes, reason = _content_passes_quality(message.subject, message.body)
             if not passes:
@@ -102,6 +111,9 @@ def send_email(message_id: str):
                 message.sent_at = datetime.now(timezone.utc)
                 message.external_id = gmail_result.get("message_id")
                 await rate_limiter.record_send("email")
+
+                from app.services.contact_guard import update_last_contacted
+                await update_last_contacted(lead, db)
 
                 activity = Activity(
                     lead_id=lead.id,
@@ -196,6 +208,140 @@ def check_replies():
             return {"checked": len(replies), "processed": processed}
 
     return run_async(_check())
+
+
+@celery_app.task(name="app.workers.email_tasks.sync_gmail_sent")
+def sync_gmail_sent():
+    """Sync Gmail sent folder — detect externally sent emails and track contacts."""
+    from app.services.email_service import gmail_service
+    from app.dependencies import create_worker_session
+    from app.models.message import Message
+    from app.models.lead import Lead
+    from app.models.activity import Activity
+    from app.models.user import SystemSetting
+    from datetime import timedelta
+    from email.utils import parsedate_to_datetime
+
+    async def _sync():
+        async with create_worker_session()() as db:
+            # 1. Read last sync timestamp from SystemSetting
+            setting_result = await db.execute(
+                select(SystemSetting).where(SystemSetting.key == "gmail_sent_last_sync")
+            )
+            setting = setting_result.scalar_one_or_none()
+
+            if setting and setting.value.get("timestamp"):
+                after_epoch = str(int(setting.value["timestamp"]))
+            else:
+                # Default to 30 days ago
+                thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+                after_epoch = str(int(thirty_days_ago.timestamp()))
+
+            # 2. Fetch sent messages from Gmail
+            sent_messages = await gmail_service.get_sent_messages(after_timestamp=after_epoch)
+
+            synced = 0
+            skipped = 0
+            new_leads_created = 0
+
+            for msg in sent_messages:
+                # 3a. Skip if already tracked
+                existing = await db.execute(
+                    select(Message).where(
+                        Message.external_id == msg["message_id"],
+                        Message.direction == "outbound",
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    skipped += 1
+                    continue
+
+                recipient_email = msg["to"].lower().strip()
+                if not recipient_email:
+                    skipped += 1
+                    continue
+
+                # Parse gmail date
+                try:
+                    gmail_date = parsedate_to_datetime(msg["date"])
+                    if gmail_date.tzinfo is None:
+                        gmail_date = gmail_date.replace(tzinfo=timezone.utc)
+                except Exception:
+                    gmail_date = datetime.now(timezone.utc)
+
+                # 3c. Look up existing lead
+                lead_result = await db.execute(
+                    select(Lead).where(Lead.email == recipient_email)
+                )
+                lead = lead_result.scalar_one_or_none()
+
+                if lead:
+                    # 3d. Existing lead — update timestamps and stage
+                    if not lead.last_contacted_at or gmail_date > lead.last_contacted_at:
+                        lead.last_contacted_at = gmail_date
+                    if lead.stage == "prospect":
+                        lead.stage = "contacted"
+                else:
+                    # 3e. New lead from sent email
+                    to_raw = msg.get("to_raw", recipient_email)
+                    if "<" in to_raw:
+                        name_part = to_raw.split("<")[0].strip().strip('"')
+                    else:
+                        name_part = recipient_email.split("@")[0]
+
+                    # Split name into first/last
+                    name_parts = name_part.split() if name_part else [recipient_email.split("@")[0]]
+                    first_name = name_parts[0] if name_parts else "Unknown"
+                    last_name = name_parts[-1] if len(name_parts) > 1 else ""
+
+                    lead = Lead(
+                        first_name=first_name,
+                        last_name=last_name,
+                        email=recipient_email,
+                        source="gmail_sync",
+                        stage="contacted",
+                        job_title="Unknown",
+                        last_contacted_at=gmail_date,
+                    )
+                    db.add(lead)
+                    await db.flush()  # Get lead.id
+                    new_leads_created += 1
+
+                # Create Message record
+                message = Message(
+                    lead_id=lead.id,
+                    direction="outbound",
+                    status="sent",
+                    channel="email",
+                    sent_at=gmail_date,
+                    external_id=msg["message_id"],
+                    body=msg["body"] or "(no body)",
+                    subject=msg["subject"],
+                )
+                db.add(message)
+
+                # Log activity
+                activity = Activity(
+                    lead_id=lead.id,
+                    type="email_sent",
+                    channel="email",
+                    description=f"Gmail sync: sent email to {recipient_email} — {msg['subject'] or '(no subject)'}",
+                )
+                db.add(activity)
+                synced += 1
+
+            # 4. Update last sync timestamp
+            now_ts = datetime.now(timezone.utc).timestamp()
+            if setting:
+                setting.value = {"timestamp": now_ts}
+            else:
+                db.add(SystemSetting(key="gmail_sent_last_sync", value={"timestamp": now_ts}))
+
+            await db.commit()
+            logger.info(f"Gmail sent sync complete: synced={synced}, skipped={skipped}, new_leads={new_leads_created}")
+            return {"synced": synced, "skipped": skipped, "new_leads_created": new_leads_created}
+
+    return run_async(_sync())
 
 
 @celery_app.task(name="app.workers.email_tasks.advance_sequences")

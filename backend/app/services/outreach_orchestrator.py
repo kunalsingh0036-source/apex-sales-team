@@ -3,6 +3,7 @@ Outreach Orchestrator — the brain of the outreach system.
 Manages sequence state machine, cross-channel coordination, anti-spam logic.
 """
 
+import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,9 @@ from app.core.rate_limiter import rate_limiter
 from app.core.channel_registry import CHANNELS, CROSS_CHANNEL_RULES
 from app.services.ai_engine import ai_engine
 from app.services.template_engine import render_template
+
+
+logger = logging.getLogger(__name__)
 
 
 class OutreachOrchestrator:
@@ -54,6 +58,13 @@ class OutreachOrchestrator:
         lead = lead_result.scalar_one_or_none()
         if not lead or lead.do_not_contact:
             enrollment.status = "completed"
+            return False
+
+        # Contact guard check
+        from app.services.contact_guard import can_contact
+        allowed, reason = await can_contact(lead, db)
+        if not allowed:
+            logger.info(f"Contact guard blocked {lead.email}: {reason}")
             return False
 
         # Check cross-channel cooldown
