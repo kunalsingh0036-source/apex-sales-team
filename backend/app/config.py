@@ -1,11 +1,14 @@
+import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from dotenv import load_dotenv
 
 # Resolve .env from project root (one level above backend/)
+# Only load in development (when the file exists and not on Railway/production)
 _ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(_ENV_FILE, override=True)
+if _ENV_FILE.exists() and not os.environ.get("RAILWAY_ENVIRONMENT"):
+    from dotenv import load_dotenv
+    load_dotenv(_ENV_FILE, override=False)  # env vars take precedence over .env
 
 
 class Settings(BaseSettings):
@@ -73,7 +76,10 @@ class Settings(BaseSettings):
     gmb_account_id: str = ""
     gmb_location_id: str = ""
 
-    model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
+    model_config = {
+        "env_file": str(_ENV_FILE) if _ENV_FILE.exists() else None,
+        "extra": "ignore",
+    }
 
 
 @lru_cache
