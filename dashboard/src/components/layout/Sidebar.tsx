@@ -8,7 +8,6 @@ const outreachItems = [
   { href: "/", label: "Dashboard", icon: "◉" },
   { href: "/leads", label: "Leads", icon: "◎" },
   { href: "/campaigns", label: "Campaigns", icon: "▶" },
-  { href: "/sequences", label: "Sequences", icon: "⟳" },
   { href: "/messages", label: "Messages", icon: "✉" },
   { href: "/analytics", label: "Analytics", icon: "◈" },
   { href: "/autopilot", label: "Autopilot", icon: "⚡" },
