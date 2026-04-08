@@ -84,4 +84,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    # Debug: log which DB host we're connecting to
+    db = s.async_database_url
+    host = db.split("@")[1].split("/")[0] if "@" in db else "unknown"
+    print(f"[config] database host: {host}")
+    print(f"[config] DATABASE_URL env exists: {bool(os.environ.get('DATABASE_URL'))}")
+    print(f"[config] RAILWAY_ENVIRONMENT: {os.environ.get('RAILWAY_ENVIRONMENT', 'not set')}")
+    return s
