@@ -72,7 +72,8 @@ export default function AutopilotPage() {
     setTriggerLoading(stage);
     try {
       const result = await api.autopilot.trigger(stage);
-      alert(`Triggered ${stage} — Task ID: ${result.task_id}`);
+      const labels: Record<string, string> = { discover: "Discovering new leads", enrich: "Enriching and scoring leads", sequences: "Generating sequences", campaigns: "Creating campaigns", full: "Running full pipeline" };
+      alert(labels[stage] || `Running ${stage}. Refresh in a moment.`);
       setTimeout(loadData, 2000);
     } catch (err: any) {
       alert("Trigger failed: " + err.message);
