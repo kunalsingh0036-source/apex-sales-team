@@ -13,7 +13,7 @@ if _ENV_FILE.exists() and not os.environ.get("RAILWAY_ENVIRONMENT"):
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "postgresql+asyncpg://apex:apex_dev_password@localhost:5432/apex_outreach"
+    database_url: str = os.environ.get("DATABASE_URL", "postgresql+asyncpg://apex:apex_dev_password@localhost:5432/apex_outreach")
     database_url_sync: str = ""
 
     @property
