@@ -104,8 +104,8 @@ export default function SequencesPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('sequences');
-      alert(JSON.stringify(result, null, 2));
-      fetchSequences();
+      alert("Sequences are being generated. Refresh in a moment.");
+      setTimeout(() => fetchSequences(), 3000);
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {

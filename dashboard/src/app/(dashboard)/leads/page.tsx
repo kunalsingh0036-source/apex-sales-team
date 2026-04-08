@@ -124,8 +124,8 @@ export default function LeadsPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('discover');
-      alert(JSON.stringify(result, null, 2));
-      fetchLeads();
+      alert("Discovering new leads. Refresh in a moment.");
+      setTimeout(() => fetchLeads(), 5000);
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {

@@ -71,8 +71,8 @@ export default function CampaignsPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('campaigns');
-      alert(JSON.stringify(result, null, 2));
-      fetchData();
+      alert("Campaigns are being created. Refresh in a moment.");
+      setTimeout(() => fetchData(), 3000);
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {
