@@ -108,8 +108,9 @@ export default function MessagesPage() {
   async function handleGenerateMessages() {
     setGenerating(true);
     try {
-      const result = await api.autopilot.trigger("full");
-      alert(JSON.stringify(result, null, 2));
+      const result = await api.autopilot.trigger("advance");
+      alert("Advancing enrollments. Messages will appear in the review queue.");
+      setTimeout(() => fetchMessages(), 5000);
     } catch (err: any) {
       alert("Failed: " + err.message);
     } finally {

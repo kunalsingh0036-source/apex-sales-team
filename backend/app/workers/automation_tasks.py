@@ -182,6 +182,27 @@ def autopilot_trigger(stage: str):
                 return await automation_engine.ensure_sequences(db)
             elif stage == "campaigns":
                 return await automation_engine.create_campaigns(db)
+            elif stage == "advance":
+                from app.services.outreach_orchestrator import orchestrator
+                from app.models.sequence import CampaignEnrollment
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                result = await db.execute(
+                    select(CampaignEnrollment).where(
+                        CampaignEnrollment.status == "active",
+                        CampaignEnrollment.next_step_at <= now,
+                    ).limit(100)
+                )
+                enrollments = result.scalars().all()
+                advanced = 0
+                for enrollment in enrollments:
+                    try:
+                        if await orchestrator.advance_enrollment(enrollment, db):
+                            advanced += 1
+                    except Exception as e:
+                        logger.error(f"Error advancing enrollment {enrollment.id}: {e}")
+                await db.commit()
+                return {"advanced": advanced, "total_eligible": len(enrollments)}
             elif stage == "full":
                 return await automation_engine.run_full_cycle(db)
             else:
