@@ -238,97 +238,46 @@ class AutomationEngine:
     # ─── Stage 3: Ensure Sequences ────────────────────────────
 
     async def ensure_sequences(self, db: AsyncSession) -> dict:
-        icp = await self.get_icp(db)
-        industries = icp.get("industries", [])
-        channels = ["email", "linkedin"]
-        active_seasons = get_active_seasons()
-
+        """Ensure one universal sequence per channel exists.
+        Sequences only define timing and step types. Actual message
+        content is generated fresh per lead by the AI engine."""
+        channels = ["email"]  # LinkedIn cold DMs not supported
         checked = 0
         created = 0
 
-        for industry in industries:
-            for channel in channels:
-                checked += 1
-                existing = await db.execute(
-                    select(Sequence).where(
-                        and_(
-                            Sequence.target_industry == industry,
-                            Sequence.channel == channel,
-                            Sequence.is_active == True,
-                        )
+        for channel in channels:
+            checked += 1
+            existing = await db.execute(
+                select(Sequence).where(
+                    and_(
+                        Sequence.target_industry == "all",
+                        Sequence.channel == channel,
+                        Sequence.is_active == True,
                     )
                 )
-                if existing.scalar_one_or_none():
-                    continue
+            )
+            if existing.scalar_one_or_none():
+                continue
 
-                # Generate 4-step sequence with A/B variants using AI
-                season_context = ""
-                if active_seasons:
-                    angles = [s.get("message_angle", "") for s in active_seasons if s.get("message_angle")]
-                    if angles:
-                        season_context = f"Current festive season angles to weave in: {', '.join(angles)}"
+            # Universal 4-step sequence — timing only, no template content
+            steps = [
+                {"channel": channel, "type": "cold_intro", "delay_days": 0},
+                {"channel": channel, "type": "follow_up_1", "delay_days": 3},
+                {"channel": channel, "type": "follow_up_2", "delay_days": 5},
+                {"channel": channel, "type": "breakup", "delay_days": 7},
+            ]
 
-                steps = []
-                step_configs = [
-                    ("cold_intro", 0),
-                    ("follow_up_1", 3),
-                    ("follow_up_2", 5),
-                    ("breakup", 7),
-                ]
-
-                for message_type, delay_days in step_configs:
-                    variants = {}
-                    for variant_label in ["A", "B"]:
-                        instruction = f"Variant {variant_label}. " + (
-                            "Be more direct and value-focused." if variant_label == "A"
-                            else "Be more conversational and story-driven."
-                        )
-                        if season_context:
-                            instruction += f" {season_context}"
-
-                        try:
-                            msg = await ai_engine.generate_outreach_message(
-                                lead_name="{{first_name}}",
-                                lead_title="{{job_title}}",
-                                lead_company="{{company_name}}",
-                                lead_industry=industry,
-                                channel=channel,
-                                message_type=message_type,
-                                custom_instructions=instruction,
-                            )
-                            variants[variant_label] = {
-                                "subject": msg.get("subject"),
-                                "body": msg.get("body", ""),
-                            }
-                        except Exception as e:
-                            logger.error(f"AI generation failed for {industry}/{channel}/{message_type}/{variant_label}: {e}")
-                            variants[variant_label] = {
-                                "subject": f"Regarding {industry} partnership",
-                                "body": f"Hi {{{{first_name}}}}, reaching out about a potential partnership.",
-                                "is_fallback": True,
-                            }
-
-                    any_fallback = any(v.get("is_fallback") for v in variants.values())
-                    steps.append({
-                        "channel": channel,
-                        "type": message_type,
-                        "delay_days": delay_days,
-                        "subject_variants": {k: v["subject"] for k, v in variants.items()},
-                        "body_variants": {k: v["body"] for k, v in variants.items()},
-                        "is_fallback": any_fallback,
-                    })
-
-                sequence = Sequence(
-                    name=f"Autopilot: {industry} ({channel})",
-                    description=f"Auto-generated sequence for {industry} via {channel}",
-                    target_industry=industry,
-                    channel=channel,
-                    is_active=True,
-                    steps=steps,
-                    settings={"source": "autopilot", "generated_at": datetime.now(IST).isoformat()},
-                )
-                db.add(sequence)
-                created += 1
+            sequence = Sequence(
+                name=f"Autopilot: Universal ({channel})",
+                description=f"Universal {channel} sequence. Content is AI-generated fresh per lead.",
+                target_industry="all",
+                channel=channel,
+                is_active=True,
+                steps=steps,
+                settings={"source": "autopilot", "generated_at": datetime.now(IST).isoformat()},
+            )
+            db.add(sequence)
+            created += 1
 
         await db.commit()
         result = {"checked": checked, "created": created}
@@ -385,65 +334,19 @@ class AutomationEngine:
             await self._log_run(db, "campaigns", r)
             return r
 
-        # Map Apollo raw industry names to ICP sequence industry labels
-        INDUSTRY_MAP = {
-            "information technology & services": "Technology & SaaS",
-            "computer software": "Technology & SaaS",
-            "internet": "Technology & SaaS",
-            "computer networking": "Technology & SaaS",
-            "telecommunications": "Technology & SaaS",
-            "financial services": "Banking & Financial Services",
-            "banking": "Banking & Financial Services",
-            "insurance": "Banking & Financial Services",
-            "investment management": "Banking & Financial Services",
-            "pharmaceuticals": "Pharma & Healthcare",
-            "hospital & health care": "Pharma & Healthcare",
-            "medical devices": "Pharma & Healthcare",
-            "biotechnology": "Pharma & Healthcare",
-            "health, wellness & fitness": "Pharma & Healthcare",
-            "food & beverages": "FMCG & Retail",
-            "food production": "FMCG & Retail",
-            "consumer goods": "FMCG & Retail",
-            "retail": "FMCG & Retail",
-            "supermarkets": "FMCG & Retail",
-            "real estate": "Real Estate",
-            "construction": "Real Estate",
-            "building materials": "Real Estate",
-            "civil engineering": "Real Estate",
-            "architecture & planning": "Real Estate",
-            "hospitality": "Hospitality & Luxury Hotels",
-            "leisure, travel & tourism": "Hospitality & Luxury Hotels",
-            "restaurants": "Hospitality & Luxury Hotels",
-            "government administration": "Defence & Government",
-            "defense & space": "Defence & Government",
-            "military": "Defence & Government",
-            "higher education": "Education",
-            "education management": "Education",
-            "e-learning": "Education",
-            "events services": "Events & Activations",
-            "entertainment": "Events & Activations",
-        }
-
-        def normalize_industry(raw: str) -> str:
-            return INDUSTRY_MAP.get(raw.lower().strip(), raw)
-
-        # Group by (industry, tier)
-        groups: dict[tuple[str, str], list] = {}
+        # Group by tier only (sequences are universal, not per-industry)
+        groups: dict[str, list] = {}
         for lead in leads:
             tier = _score_tier(lead.lead_score)
             if tier == "cold" and not aggr_config["include_cold"]:
                 continue
-            industry = "Other"
-            if lead.company:
-                industry = normalize_industry(lead.company.industry or "Other")
-            key = (industry, tier)
-            groups.setdefault(key, []).append(lead)
+            groups.setdefault(tier, []).append(lead)
 
         campaigns_created = 0
         leads_enrolled = 0
         today = date.today().isoformat()
 
-        for (industry, tier), group_leads in groups.items():
+        for tier, group_leads in groups.items():
             channels, delay_mult = TIER_STRATEGY[tier]
 
             for channel in channels:
@@ -451,32 +354,18 @@ class AutomationEngine:
                 if channel == "linkedin":
                     continue
 
-                # Find matching sequence by industry
+                # Find the universal sequence for this channel
                 seq_result = await db.execute(
                     select(Sequence).where(
                         and_(
-                            Sequence.target_industry == industry,
+                            Sequence.target_industry == "all",
                             Sequence.channel == channel,
                             Sequence.is_active == True,
-                            Sequence.name.like("Autopilot:%"),
                         )
                     )
                 )
                 sequence = seq_result.scalar_one_or_none()
                 if not sequence:
-                    # Fallback to "all industries" generic sequence
-                    seq_result = await db.execute(
-                        select(Sequence).where(
-                            and_(
-                                Sequence.target_industry == "all industries",
-                                Sequence.channel == channel,
-                                Sequence.is_active == True,
-                                Sequence.name.like("Autopilot:%"),
-                            )
-                        )
-                    )
-                    sequence = seq_result.scalar_one_or_none()
-                    if not sequence:
                         continue
 
                 # Verify sequence has actual message content
@@ -492,7 +381,7 @@ class AutomationEngine:
                     continue
 
                 campaign = Campaign(
-                    name=f"Autopilot: {industry} {tier} ({today})",
+                    name=f"Autopilot: {tier} leads ({today})",
                     sequence_id=sequence.id,
                     status="active",
                     target_filter={
