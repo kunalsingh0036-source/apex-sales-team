@@ -7,7 +7,6 @@ import { clsx } from "clsx";
 const outreachItems = [
   { href: "/", label: "Dashboard", icon: "◉" },
   { href: "/leads", label: "Leads", icon: "◎" },
-  { href: "/discovery", label: "Discovery", icon: "⊕" },
   { href: "/campaigns", label: "Campaigns", icon: "▶" },
   { href: "/sequences", label: "Sequences", icon: "⟳" },
   { href: "/messages", label: "Messages", icon: "✉" },

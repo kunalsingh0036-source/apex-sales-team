@@ -4,8 +4,41 @@ import { useEffect, useState, useRef } from "react";
 import Header from "@/components/layout/Header";
 import LeadTable from "@/components/leads/LeadTable";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
 import { Lead, PaginatedResponse, INDUSTRIES, SENIORITY_LEVELS } from "@/lib/types";
+
+interface PersonResult {
+  first_name: string;
+  last_name: string;
+  name: string;
+  title: string;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  city: string;
+  seniority: string;
+  company: { name: string; domain: string; industry: string; employee_count: number | null };
+}
+
+const APEX_INDUSTRIES = [
+  { value: "technology", label: "Technology & SaaS" },
+  { value: "banking", label: "Banking & Finance" },
+  { value: "defense", label: "Defence & Government" },
+  { value: "hospitality", label: "Hospitality & Hotels" },
+  { value: "healthcare", label: "Healthcare" },
+  { value: "real estate", label: "Real Estate" },
+  { value: "education", label: "Education" },
+  { value: "events", label: "Events & Activations" },
+];
+
+const APEX_ROLES = [
+  "CEO", "COO", "CFO", "CMO", "CHRO",
+  "Head of Procurement", "Head of HR",
+  "VP Operations", "VP Marketing",
+  "Director of Administration",
+  "Purchase Manager", "Brand Manager",
+];
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -21,6 +54,22 @@ export default function LeadsPage() {
 
   const [generating, setGenerating] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDiscovery, setShowDiscovery] = useState(false);
+
+  // Discovery state
+  const [discoverySearching, setDiscoverySearching] = useState(false);
+  const [discoveryResults, setDiscoveryResults] = useState<PersonResult[]>([]);
+  const [discoveryTotal, setDiscoveryTotal] = useState(0);
+  const [discoveryImporting, setDiscoveryImporting] = useState(false);
+  const [discoveryForm, setDiscoveryForm] = useState({
+    job_titles: [] as string[],
+    industries: [] as string[],
+    locations: ["India"],
+    company_sizes: [] as string[],
+    keywords: "",
+  });
+  const [emailVerify, setEmailVerify] = useState({ email: "", result: null as any, loading: false });
+  const [emailFind, setEmailFind] = useState({ domain: "", firstName: "", lastName: "", result: null as any, loading: false });
   const [newLead, setNewLead] = useState({
     first_name: "",
     last_name: "",
@@ -102,6 +151,74 @@ export default function LeadsPage() {
     } catch (err: any) {
       alert("Failed to create lead: " + err.message);
     }
+  }
+
+  async function handleDiscoverySearch() {
+    setDiscoverySearching(true);
+    setDiscoveryResults([]);
+    try {
+      const data = await api.discovery.searchPeople({
+        job_titles: discoveryForm.job_titles.length > 0 ? discoveryForm.job_titles : undefined,
+        industries: discoveryForm.industries.length > 0 ? discoveryForm.industries : undefined,
+        locations: discoveryForm.locations.length > 0 ? discoveryForm.locations : undefined,
+        company_sizes: discoveryForm.company_sizes.length > 0 ? discoveryForm.company_sizes : undefined,
+        keywords: discoveryForm.keywords ? discoveryForm.keywords.split(",").map((k: string) => k.trim()) : undefined,
+      });
+      setDiscoveryResults(data.people || []);
+      setDiscoveryTotal(data.total || 0);
+    } catch (err: any) { alert("Search failed: " + err.message); }
+    finally { setDiscoverySearching(false); }
+  }
+
+  async function handleDiscoveryImport() {
+    setDiscoveryImporting(true);
+    try {
+      const data = await api.discovery.importFromApollo({
+        job_titles: discoveryForm.job_titles.length > 0 ? discoveryForm.job_titles : undefined,
+        industries: discoveryForm.industries.length > 0 ? discoveryForm.industries : undefined,
+        locations: discoveryForm.locations,
+        company_sizes: discoveryForm.company_sizes.length > 0 ? discoveryForm.company_sizes : undefined,
+        keywords: discoveryForm.keywords ? discoveryForm.keywords.split(",").map((k: string) => k.trim()) : undefined,
+        max_results: 100,
+      });
+      alert(`Import started! Task ID: ${data.task_id}`);
+      fetchLeads();
+    } catch (err: any) { alert("Import failed: " + err.message); }
+    finally { setDiscoveryImporting(false); }
+  }
+
+  async function handleVerifyEmail() {
+    setEmailVerify({ ...emailVerify, loading: true, result: null });
+    try {
+      const result = await api.discovery.verifyEmail(emailVerify.email);
+      setEmailVerify({ ...emailVerify, loading: false, result });
+    } catch (err: any) { setEmailVerify({ ...emailVerify, loading: false, result: { error: err.message } }); }
+  }
+
+  async function handleFindEmail() {
+    setEmailFind({ ...emailFind, loading: true, result: null });
+    try {
+      const result = await api.discovery.findEmail(emailFind.domain, emailFind.firstName, emailFind.lastName);
+      setEmailFind({ ...emailFind, loading: false, result });
+    } catch (err: any) { setEmailFind({ ...emailFind, loading: false, result: { error: err.message } }); }
+  }
+
+  function toggleRole(role: string) {
+    setDiscoveryForm({
+      ...discoveryForm,
+      job_titles: discoveryForm.job_titles.includes(role)
+        ? discoveryForm.job_titles.filter((r) => r !== role)
+        : [...discoveryForm.job_titles, role],
+    });
+  }
+
+  function toggleIndustry(ind: string) {
+    setDiscoveryForm({
+      ...discoveryForm,
+      industries: discoveryForm.industries.includes(ind)
+        ? discoveryForm.industries.filter((i) => i !== ind)
+        : [...discoveryForm.industries, ind],
+    });
   }
 
   return (
@@ -265,6 +382,132 @@ export default function LeadsPage() {
           </form>
         </div>
       )}
+
+      {/* Discovery Tools (collapsible) */}
+      <div className="mb-6">
+        <button
+          onClick={() => setShowDiscovery(!showDiscovery)}
+          className="flex items-center gap-2 text-sm font-bold text-crimson-dark hover:text-crimson transition-colors"
+        >
+          <span className="text-xs">{showDiscovery ? "▼" : "▶"}</span>
+          Discovery Tools (Apollo, Email Finder, Scoring)
+        </button>
+
+        {showDiscovery && (
+          <div className="mt-4 space-y-6">
+            {/* Apollo Search */}
+            <div className="bg-white rounded-xl p-6 border border-rich-creme">
+              <h3 className="font-display text-base font-bold text-crimson-dark mb-4">Search Apollo.io</h3>
+              <div className="mb-3">
+                <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-2">Target Roles</label>
+                <div className="flex flex-wrap gap-2">
+                  {APEX_ROLES.map((role) => (
+                    <button key={role} onClick={() => toggleRole(role)} className={`text-xs px-3 py-1.5 rounded border transition-colors ${discoveryForm.job_titles.includes(role) ? "bg-crimson text-white border-crimson" : "border-rich-creme text-warm-charcoal hover:border-crimson"}`}>
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-2">Industries</label>
+                <div className="flex flex-wrap gap-2">
+                  {APEX_INDUSTRIES.map((ind) => (
+                    <button key={ind.value} onClick={() => toggleIndustry(ind.value)} className={`text-xs px-3 py-1.5 rounded border transition-colors ${discoveryForm.industries.includes(ind.value) ? "bg-crimson text-white border-crimson" : "border-rich-creme text-warm-charcoal hover:border-crimson"}`}>
+                      {ind.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div>
+                  <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-1">Location</label>
+                  <input value={discoveryForm.locations.join(", ")} onChange={(e) => setDiscoveryForm({ ...discoveryForm, locations: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} placeholder="India, Mumbai" className="w-full px-3 py-2 border border-rich-creme rounded text-sm" />
+                </div>
+                <div>
+                  <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-1">Company Size</label>
+                  <select multiple value={discoveryForm.company_sizes} onChange={(e) => setDiscoveryForm({ ...discoveryForm, company_sizes: Array.from(e.target.selectedOptions, (o) => o.value) })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm h-[38px]">
+                    <option value="1-10">1-10</option><option value="11-50">11-50</option><option value="51-200">51-200</option>
+                    <option value="201-500">201-500</option><option value="501-1000">501-1000</option><option value="1001-5000">1001-5000</option><option value="5001+">5001+</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-1">Keywords</label>
+                  <input value={discoveryForm.keywords} onChange={(e) => setDiscoveryForm({ ...discoveryForm, keywords: e.target.value })} placeholder="corporate gifting, apparel" className="w-full px-3 py-2 border border-rich-creme rounded text-sm" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button size="sm" onClick={handleDiscoverySearch} disabled={discoverySearching}>{discoverySearching ? "Searching..." : "Search Apollo.io"}</Button>
+                <Button size="sm" variant="outline" onClick={handleDiscoveryImport} disabled={discoveryImporting}>{discoveryImporting ? "Importing..." : "Bulk Import (up to 100)"}</Button>
+                <Button size="sm" variant="outline" onClick={() => api.discovery.batchScore()}>Score All Unscored</Button>
+              </div>
+            </div>
+
+            {/* Search Results */}
+            {discoveryResults.length > 0 && (
+              <div className="bg-white rounded-xl border border-rich-creme overflow-hidden">
+                <div className="px-5 py-3 bg-creme/50 border-b border-rich-creme">
+                  <p className="text-sm font-bold text-warm-charcoal">{discoveryTotal.toLocaleString()} results found</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-rich-creme">
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Name</th>
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Title</th>
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Company</th>
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Industry</th>
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Email</th>
+                        <th className="text-left px-5 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">City</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {discoveryResults.map((person, i) => (
+                        <tr key={i} className="border-b border-rich-creme/50 hover:bg-creme/30">
+                          <td className="px-5 py-3 text-sm font-bold text-warm-charcoal max-w-[150px] truncate">{person.name}</td>
+                          <td className="px-5 py-3 text-sm text-warm-charcoal max-w-[150px] truncate">{person.title}</td>
+                          <td className="px-5 py-3 text-sm text-warm-charcoal max-w-[150px] truncate">{person.company?.name}</td>
+                          <td className="px-5 py-3"><Badge variant="default">{person.company?.industry || "—"}</Badge></td>
+                          <td className="px-5 py-3 text-sm font-mono text-warm-charcoal max-w-[160px] truncate">{person.email || <span className="text-mid-warm italic">hidden</span>}</td>
+                          <td className="px-5 py-3 text-xs text-mid-warm">{person.city}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Email Tools */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl p-5 border border-rich-creme">
+                <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Email Verification (Hunter.io)</h3>
+                <div className="flex gap-2 mb-2">
+                  <input value={emailVerify.email} onChange={(e) => setEmailVerify({ ...emailVerify, email: e.target.value })} placeholder="email@example.com" className="flex-1 px-3 py-2 border border-rich-creme rounded text-sm" />
+                  <Button size="sm" onClick={handleVerifyEmail} disabled={emailVerify.loading || !emailVerify.email}>{emailVerify.loading ? "..." : "Verify"}</Button>
+                </div>
+                {emailVerify.result && (
+                  <div className="text-sm">
+                    <Badge variant={emailVerify.result.status === "valid" ? "success" : emailVerify.result.status === "invalid" ? "crimson" : "warning"}>{emailVerify.result.status}</Badge>
+                    <span className="ml-2 text-mid-warm">Score: {emailVerify.result.score}/100</span>
+                  </div>
+                )}
+              </div>
+              <div className="bg-white rounded-xl p-5 border border-rich-creme">
+                <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Email Finder (Hunter.io)</h3>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <input value={emailFind.domain} onChange={(e) => setEmailFind({ ...emailFind, domain: e.target.value })} placeholder="company.com" className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                  <input value={emailFind.firstName} onChange={(e) => setEmailFind({ ...emailFind, firstName: e.target.value })} placeholder="First name" className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                  <input value={emailFind.lastName} onChange={(e) => setEmailFind({ ...emailFind, lastName: e.target.value })} placeholder="Last name" className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                </div>
+                <Button size="sm" onClick={handleFindEmail} disabled={emailFind.loading || !emailFind.domain}>{emailFind.loading ? "..." : "Find Email"}</Button>
+                {emailFind.result && emailFind.result.email && (
+                  <div className="mt-2 text-sm"><span className="font-mono text-warm-charcoal">{emailFind.result.email}</span> <span className="text-mid-warm">Score: {emailFind.result.score}/100</span></div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Stats bar */}
       <div className="flex items-center justify-between mb-4">
