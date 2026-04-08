@@ -38,7 +38,10 @@ export default function MessagesPage() {
     direction: "",
     channel: "",
     classification: "",
+    status: "content_review",
   });
+  const [approving, setApproving] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<MessageItem | null>(null);
   const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [loadingReply, setLoadingReply] = useState(false);
@@ -52,6 +55,7 @@ export default function MessagesPage() {
     setLoading(true);
     try {
       const params: Record<string, string> = {};
+      if (filter.status) params.status = filter.status;
       if (filter.direction) params.direction = filter.direction;
       if (filter.channel) params.channel = filter.channel;
       if (filter.classification) params.classification = filter.classification;
@@ -120,20 +124,87 @@ export default function MessagesPage() {
     }
   }
 
+  async function handleApprove(id: string) {
+    setApproving(true);
+    try {
+      await api.messages.approve(id);
+      toast("Message approved and sent.", "success");
+      setSelectedMessage(null);
+      fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleReject(id: string) {
+    try {
+      await api.messages.reject(id);
+      toast("Message rejected.", "info");
+      setSelectedMessage(null);
+      fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function handleRegenerate(id: string) {
+    try {
+      await api.messages.regenerate(id);
+      toast("Regenerating message with AI...", "info");
+      setTimeout(() => fetchMessages(), 3000);
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function handleApproveAll() {
+    const reviewIds = messages.filter((m) => m.status === "content_review").map((m) => m.id);
+    if (reviewIds.length === 0) return;
+    setApprovingAll(true);
+    try {
+      const result = await api.messages.approveBatch(reviewIds);
+      toast(`Approved ${result.approved || reviewIds.length} messages.`, "success");
+      fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setApprovingAll(false);
+    }
+  }
+
+  const reviewCount = messages.filter((m) => m.status === "content_review").length;
+
   return (
     <div>
       <Header title="Unified Inbox" />
 
       {/* Actions */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 items-center">
         <Button size="sm" onClick={() => setShowComposeModal(true)}>Compose</Button>
         <Button variant="outline" size="sm" onClick={handleGenerateMessages} disabled={generating}>
           {generating ? "Running..." : "Generate Messages"}
         </Button>
+        {reviewCount > 0 && (
+          <Button size="sm" variant="primary" onClick={handleApproveAll} disabled={approvingAll}>
+            {approvingAll ? "Approving..." : `Approve All (${reviewCount})`}
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
       <div className="flex gap-4 mb-8 flex-wrap">
+        <select
+          value={filter.status}
+          onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+          className="px-3 py-2 border border-rich-creme rounded text-sm"
+        >
+          <option value="content_review">Pending Review</option>
+          <option value="sent">Sent</option>
+          <option value="failed">Failed</option>
+          <option value="">All Statuses</option>
+        </select>
         <select
           value={filter.direction}
           onChange={(e) => setFilter({ ...filter, direction: e.target.value })}
@@ -329,6 +400,21 @@ export default function MessagesPage() {
                   : new Date(selectedMessage.created_at).toLocaleString("en-IN")}
               </p>
             </div>
+
+            {/* Approve / Reject / Regenerate for content_review */}
+            {selectedMessage.status === "content_review" && (
+              <div className="flex gap-2 mb-6">
+                <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
+                  {approving ? "Sending..." : "Approve & Send"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleRegenerate(selectedMessage.id)}>
+                  Regenerate
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => handleReject(selectedMessage.id)}>
+                  Reject
+                </Button>
+              </div>
+            )}
 
             {/* Classification controls for inbound */}
             {selectedMessage.direction === "inbound" && (

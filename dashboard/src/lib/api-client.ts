@@ -199,6 +199,17 @@ export const api = {
       request<any>(`/messages/${id}/classify?classification=${classification}`, {
         method: "POST",
       }),
+    approve: (id: string) =>
+      request<any>(`/messages/${id}/approve`, { method: "POST" }),
+    approveBatch: (ids: string[]) =>
+      request<any>("/messages/approve-batch", {
+        method: "POST",
+        body: JSON.stringify({ message_ids: ids }),
+      }),
+    reject: (id: string) =>
+      request<any>(`/messages/${id}/reject`, { method: "POST" }),
+    regenerate: (id: string) =>
+      request<any>(`/messages/${id}/regenerate`, { method: "POST" }),
   },
 
   // Discovery & Enrichment
