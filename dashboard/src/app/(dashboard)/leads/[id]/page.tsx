@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Lead, Activity, STAGE_LABELS, LeadStage } from "@/lib/types";
 
 const STAGES: LeadStage[] = [
@@ -18,6 +19,7 @@ export default function LeadDetailPage() {
   const router = useRouter();
   const leadId = params.id as string;
 
+  const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null>(null);
   const [timeline, setTimeline] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ export default function LeadDetailPage() {
       const newTimeline = await api.leads.timeline(leadId);
       setTimeline(newTimeline);
     } catch (err: any) {
-      alert("Failed to update stage: " + err.message);
+      toast(err.message, "error");
     }
   }
 

@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 interface CampaignItem {
   id: string;
@@ -23,6 +24,7 @@ export default function CampaignsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "" });
 
+  const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
 
   async function fetchData() {
@@ -49,7 +51,7 @@ export default function CampaignsPage() {
       setForm({ name: "" });
       fetchData();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -57,10 +59,10 @@ export default function CampaignsPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('campaigns');
-      alert("Campaigns are being created. Refresh in a moment.");
+      toast("Campaigns are being created. Refresh in a moment.", "success");
       setTimeout(() => fetchData(), 3000);
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setGenerating(false);
     }
@@ -71,7 +73,7 @@ export default function CampaignsPage() {
       await api.campaigns.updateStatus(id, newStatus);
       fetchData();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -81,7 +83,7 @@ export default function CampaignsPage() {
       await api.campaigns.delete(id);
       fetchData();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 

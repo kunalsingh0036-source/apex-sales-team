@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Quote, PaginatedResponse, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { clsx } from "clsx";
 
@@ -16,6 +17,7 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [quoteForm, setQuoteForm] = useState({ client_id: "", total_amount: "", valid_until: "", notes: "" });
 
@@ -53,7 +55,7 @@ export default function QuotesPage() {
       setQuoteForm({ client_id: "", total_amount: "", valid_until: "", notes: "" });
       fetchQuotes();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSaving(false);
     }

@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 const DAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -14,6 +15,7 @@ export default function AutopilotPage() {
   const [toggling, setToggling] = useState(false);
   const [triggerLoading, setTriggerLoading] = useState<string | null>(null);
   const [savingIcp, setSavingIcp] = useState(false);
+  const { toast } = useToast();
   const [savingSettings, setSavingSettings] = useState(false);
 
   // ICP form state
@@ -62,7 +64,7 @@ export default function AutopilotPage() {
       await api.autopilot.toggle(!status.enabled);
       await loadData();
     } catch (err: any) {
-      alert("Toggle failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setToggling(false);
     }
@@ -73,10 +75,10 @@ export default function AutopilotPage() {
     try {
       const result = await api.autopilot.trigger(stage);
       const labels: Record<string, string> = { discover: "Discovering new leads", enrich: "Enriching and scoring leads", sequences: "Generating sequences", campaigns: "Creating campaigns", full: "Running full pipeline" };
-      alert(labels[stage] || `Running ${stage}. Refresh in a moment.`);
+      toast(labels[stage] || `Running ${stage}. Refresh in a moment.`, "success");
       setTimeout(loadData, 2000);
     } catch (err: any) {
-      alert("Trigger failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setTriggerLoading(null);
     }
@@ -94,7 +96,7 @@ export default function AutopilotPage() {
       });
       await loadData();
     } catch (err: any) {
-      alert("Save failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSavingIcp(false);
     }
@@ -109,7 +111,7 @@ export default function AutopilotPage() {
       });
       await loadData();
     } catch (err: any) {
-      alert("Save failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSavingSettings(false);
     }

@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 interface MessageItem {
   id: string;
@@ -44,6 +45,7 @@ export default function MessagesPage() {
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composing, setComposing] = useState(false);
   const [composeForm, setComposeForm] = useState({ to: "", subject: "", body: "", channel: "email" });
+  const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
 
   async function fetchMessages() {
@@ -86,7 +88,7 @@ export default function MessagesPage() {
       await api.messages.classify(msgId, classification);
       fetchMessages();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -99,7 +101,7 @@ export default function MessagesPage() {
       setComposeForm({ to: "", subject: "", body: "", channel: "email" });
       fetchMessages();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setComposing(false);
     }
@@ -109,10 +111,10 @@ export default function MessagesPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger("advance");
-      alert("Advancing enrollments. Messages will appear in the review queue.");
+      toast("Advancing enrollments. Messages will appear in the review queue.", "success");
       setTimeout(() => fetchMessages(), 5000);
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setGenerating(false);
     }

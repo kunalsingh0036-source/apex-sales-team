@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Lead } from "@/lib/types";
 
 export default function CampaignDetailPage() {
@@ -17,6 +18,7 @@ export default function CampaignDetailPage() {
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [availableLeads, setAvailableLeads] = useState<Lead[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
+  const { toast } = useToast();
   const [showEnroll, setShowEnroll] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +50,7 @@ export default function CampaignDetailPage() {
     if (selectedLeads.length === 0) return;
     try {
       const result = await api.campaigns.enroll(campaignId, selectedLeads);
-      alert(`Enrolled ${result.enrolled} leads. Skipped ${result.skipped}.`);
+      toast(`Enrolled ${result.enrolled} leads. Skipped ${result.skipped}.`, "success");
       setShowEnroll(false);
       setSelectedLeads([]);
       // Refresh
@@ -59,7 +61,7 @@ export default function CampaignDetailPage() {
       setCampaign(campaignData);
       setEnrollments(enrollData.items);
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 

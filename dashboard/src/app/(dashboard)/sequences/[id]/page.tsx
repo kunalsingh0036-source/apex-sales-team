@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 interface StepData {
   step_number: number;
@@ -52,6 +53,7 @@ export default function SequenceDetailPage() {
   const [steps, setSteps] = useState<StepData[]>([]);
   const [editingStep, setEditingStep] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -118,9 +120,9 @@ export default function SequenceDetailPage() {
     try {
       await api.sequences.update(sequenceId, { steps });
       setDirty(false);
-      alert("Sequence saved!");
+      toast("Sequence saved!", "success");
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSaving(false);
     }

@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 interface PersonResult {
   first_name: string;
@@ -49,6 +50,7 @@ export default function DiscoveryPage() {
   const [results, setResults] = useState<PersonResult[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [selectedForImport, setSelectedForImport] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
   const [importing, setImporting] = useState(false);
 
   const [form, setForm] = useState({
@@ -76,7 +78,7 @@ export default function DiscoveryPage() {
       setResults(data.people || []);
       setTotalResults(data.total || 0);
     } catch (err: any) {
-      alert("Search failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSearching(false);
     }
@@ -93,9 +95,9 @@ export default function DiscoveryPage() {
         keywords: form.keywords ? form.keywords.split(",").map((k: string) => k.trim()) : undefined,
         max_results: 100,
       });
-      alert(`Import started! Task ID: ${data.task_id}`);
+      toast(`Import started! Task ID: ${data.task_id}`, "success");
     } catch (err: any) {
-      alert("Import failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setImporting(false);
     }

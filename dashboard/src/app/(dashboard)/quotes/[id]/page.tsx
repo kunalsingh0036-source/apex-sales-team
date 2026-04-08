@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Quote, QUOTE_STATUS_COLORS } from "@/lib/types";
 import { clsx } from "clsx";
 
@@ -14,6 +15,7 @@ export default function QuoteDetailPage() {
   const router = useRouter();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function QuoteDetailPage() {
       const updated = await api.quotes.updateStatus(id, status);
       setQuote(updated);
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, "error");
     } finally {
       setActionLoading(false);
     }
@@ -49,7 +51,7 @@ export default function QuoteDetailPage() {
       const order = await api.quotes.convertToOrder(id, {});
       router.push(`/orders/${order.id}`);
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, "error");
     } finally {
       setActionLoading(false);
     }

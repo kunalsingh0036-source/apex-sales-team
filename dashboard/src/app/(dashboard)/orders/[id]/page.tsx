@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Order, OrderStageLog, OrderStage, ORDER_STAGE_LABELS, ORDER_STAGE_COLORS } from "@/lib/types";
 import { clsx } from "clsx";
 
@@ -27,6 +28,7 @@ export default function OrderDetailPage() {
   const [stageHistory, setStageHistory] = useState<OrderStageLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [advancing, setAdvancing] = useState(false);
+  const { toast } = useToast();
   const [stageNotes, setStageNotes] = useState("");
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function OrderDetailPage() {
       const history = await api.orders.stageHistory(id);
       setStageHistory(history);
     } catch (err: any) {
-      alert(err.message);
+      toast(err.message, "error");
     } finally {
       setAdvancing(false);
     }

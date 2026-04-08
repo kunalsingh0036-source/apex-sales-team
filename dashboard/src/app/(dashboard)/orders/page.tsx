@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import {
   Order, PaginatedResponse, OrderStage,
   ORDER_STAGE_LABELS, ORDER_STAGE_COLORS,
@@ -25,6 +26,7 @@ export default function OrdersPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [pipeline, setPipeline] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [orderForm, setOrderForm] = useState({ client_id: "", total_amount: "", priority: "normal", notes: "" });
 
@@ -67,7 +69,7 @@ export default function OrdersPage() {
       setOrderForm({ client_id: "", total_amount: "", priority: "normal", notes: "" });
       fetchOrders();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setSaving(false);
     }

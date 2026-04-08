@@ -6,6 +6,7 @@ import LeadTable from "@/components/leads/LeadTable";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Lead, PaginatedResponse, INDUSTRIES, SENIORITY_LEVELS } from "@/lib/types";
 
 interface PersonResult {
@@ -70,6 +71,7 @@ export default function LeadsPage() {
   });
   const [emailVerify, setEmailVerify] = useState({ email: "", result: null as any, loading: false });
   const [emailFind, setEmailFind] = useState({ domain: "", firstName: "", lastName: "", result: null as any, loading: false });
+  const { toast } = useToast();
   const [newLead, setNewLead] = useState({
     first_name: "",
     last_name: "",
@@ -124,10 +126,10 @@ export default function LeadsPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('discover');
-      alert("Discovering new leads. Refresh in a moment.");
+      toast("Discovering new leads. Refresh in a moment.", "success");
       setTimeout(() => fetchLeads(), 5000);
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setGenerating(false);
     }
@@ -149,7 +151,7 @@ export default function LeadsPage() {
       });
       fetchLeads();
     } catch (err: any) {
-      alert("Failed to create lead: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -166,7 +168,7 @@ export default function LeadsPage() {
       });
       setDiscoveryResults(data.people || []);
       setDiscoveryTotal(data.total || 0);
-    } catch (err: any) { alert("Search failed: " + err.message); }
+    } catch (err: any) { toast(err.message, "error"); }
     finally { setDiscoverySearching(false); }
   }
 
@@ -181,9 +183,9 @@ export default function LeadsPage() {
         keywords: discoveryForm.keywords ? discoveryForm.keywords.split(",").map((k: string) => k.trim()) : undefined,
         max_results: 100,
       });
-      alert(`Import started! Task ID: ${data.task_id}`);
+      toast(`Import started! Task ID: ${data.task_id}`, "success");
       fetchLeads();
-    } catch (err: any) { alert("Import failed: " + err.message); }
+    } catch (err: any) { toast(err.message, "error"); }
     finally { setDiscoveryImporting(false); }
   }
 

@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 
 interface SequenceItem {
   id: string;
@@ -29,6 +30,7 @@ export default function SequencesPage() {
     target_industry: "",
   });
 
+  const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
 
   async function fetchSequences() {
@@ -96,7 +98,7 @@ export default function SequencesPage() {
       setForm({ name: "", description: "", channel: "email", target_industry: "" });
       fetchSequences();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -104,10 +106,10 @@ export default function SequencesPage() {
     setGenerating(true);
     try {
       const result = await api.autopilot.trigger('sequences');
-      alert("Sequences are being generated. Refresh in a moment.");
+      toast("Sequences are being generated. Refresh in a moment.", "success");
       setTimeout(() => fetchSequences(), 3000);
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     } finally {
       setGenerating(false);
     }
@@ -118,7 +120,7 @@ export default function SequencesPage() {
       await api.sequences.duplicate(id);
       fetchSequences();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -128,7 +130,7 @@ export default function SequencesPage() {
       await api.sequences.delete(id);
       fetchSequences();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
@@ -137,7 +139,7 @@ export default function SequencesPage() {
       await api.sequences.update(seq.id, { is_active: !seq.is_active });
       fetchSequences();
     } catch (err: any) {
-      alert("Failed: " + err.message);
+      toast(err.message, "error");
     }
   }
 
