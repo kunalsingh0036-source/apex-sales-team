@@ -345,6 +345,7 @@ class AutomationEngine:
         campaigns_created = 0
         leads_enrolled = 0
         today = date.today().isoformat()
+        debug_info = {"eligible_leads": len(leads), "groups": {t: len(g) for t, g in groups.items()}}
 
         for tier, group_leads in groups.items():
             channels, delay_mult = TIER_STRATEGY[tier]
@@ -395,7 +396,6 @@ class AutomationEngine:
                     sequence_id=sequence.id,
                     status="active",
                     target_filter={
-                        "industry": industry,
                         "tier": tier,
                         "source": "autopilot",
                         "channel": channel,
@@ -427,7 +427,7 @@ class AutomationEngine:
                 campaigns_created += 1
 
         await db.commit()
-        result = {"campaigns_created": campaigns_created, "leads_enrolled": leads_enrolled}
+        result = {"campaigns_created": campaigns_created, "leads_enrolled": leads_enrolled, "debug": debug_info}
         await self._log_run(db, "campaigns", result)
         return result
 
