@@ -16,6 +16,9 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", sku: "", category: "", base_price: "", moq: "", gsm: "", description: "" });
 
   async function fetchData() {
     setLoading(true);
@@ -42,6 +45,26 @@ export default function ProductsPage() {
     fetchData();
   }, [page, categoryFilter]);
 
+  async function handleAddProduct(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.products.create({
+        ...form,
+        base_price: form.base_price ? Number(form.base_price) : undefined,
+        moq: form.moq ? Number(form.moq) : undefined,
+        gsm: form.gsm ? Number(form.gsm) : undefined,
+      });
+      setShowModal(false);
+      setForm({ name: "", sku: "", category: "", base_price: "", moq: "", gsm: "", description: "" });
+      fetchData();
+    } catch (err) {
+      console.error("Failed to create product:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setPage(1);
@@ -58,7 +81,10 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <Header title="Product Catalogue" />
+      <div className="flex items-center justify-between mb-2">
+        <Header title="Product Catalogue" />
+        <Button size="sm" onClick={() => setShowModal(true)}>+ Add Product</Button>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-8">
@@ -185,6 +211,26 @@ export default function ProductsPage() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">Add Product</h2>
+            <form onSubmit={handleAddProduct} className="space-y-3">
+              <input type="text" placeholder="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="number" placeholder="Base Price" value={form.base_price} onChange={(e) => setForm({ ...form, base_price: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="number" placeholder="MOQ" value={form.moq} onChange={(e) => setForm({ ...form, moq: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="number" placeholder="GSM" value={form.gsm} onChange={(e) => setForm({ ...form, gsm: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson resize-none" />
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

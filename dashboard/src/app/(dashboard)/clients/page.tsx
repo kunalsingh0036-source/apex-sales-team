@@ -18,6 +18,9 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [amaFilter, setAmaFilter] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", company: "", ama_tier: "bronze" });
 
   async function fetchClients() {
     setLoading(true);
@@ -41,6 +44,21 @@ export default function ClientsPage() {
     fetchClients();
   }, [page, statusFilter, amaFilter]);
 
+  async function handleAddClient(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.clients.create(form);
+      setShowModal(false);
+      setForm({ name: "", email: "", phone: "", company: "", ama_tier: "bronze" });
+      fetchClients();
+    } catch (err) {
+      console.error("Failed to create client:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     setPage(1);
@@ -49,7 +67,10 @@ export default function ClientsPage() {
 
   return (
     <div>
-      <Header title="Clients" />
+      <div className="flex items-center justify-between mb-2">
+        <Header title="Clients" />
+        <Button size="sm" onClick={() => setShowModal(true)}>+ Add Client</Button>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-8">
@@ -172,6 +193,29 @@ export default function ClientsPage() {
             <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
               Next
             </Button>
+          </div>
+        </div>
+      )}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">Add Client</h2>
+            <form onSubmit={handleAddClient} className="space-y-3">
+              <input type="text" placeholder="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <select value={form.ama_tier} onChange={(e) => setForm({ ...form, ama_tier: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson">
+                <option value="bronze">Bronze</option>
+                <option value="silver">Silver</option>
+                <option value="gold">Gold</option>
+                <option value="institutional">Institutional</option>
+              </select>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

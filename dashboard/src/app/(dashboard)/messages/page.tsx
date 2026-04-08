@@ -41,6 +41,10 @@ export default function MessagesPage() {
   const [selectedMessage, setSelectedMessage] = useState<MessageItem | null>(null);
   const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [loadingReply, setLoadingReply] = useState(false);
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [composeForm, setComposeForm] = useState({ to: "", subject: "", body: "", channel: "email" });
+  const [generating, setGenerating] = useState(false);
 
   async function fetchMessages() {
     setLoading(true);
@@ -86,9 +90,44 @@ export default function MessagesPage() {
     }
   }
 
+  async function handleCompose(e: React.FormEvent) {
+    e.preventDefault();
+    setComposing(true);
+    try {
+      await api.messages.send(composeForm);
+      setShowComposeModal(false);
+      setComposeForm({ to: "", subject: "", body: "", channel: "email" });
+      fetchMessages();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setComposing(false);
+    }
+  }
+
+  async function handleGenerateMessages() {
+    setGenerating(true);
+    try {
+      const result = await api.autopilot.trigger("full");
+      alert(JSON.stringify(result, null, 2));
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <div>
       <Header title="Unified Inbox" />
+
+      {/* Actions */}
+      <div className="flex gap-2 mb-6">
+        <Button size="sm" onClick={() => setShowComposeModal(true)}>Compose</Button>
+        <Button variant="outline" size="sm" onClick={handleGenerateMessages} disabled={generating}>
+          {generating ? "Running..." : "Generate Messages"}
+        </Button>
+      </div>
 
       {/* Filters */}
       <div className="flex gap-4 mb-8 flex-wrap">
@@ -185,6 +224,54 @@ export default function MessagesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Compose Modal */}
+      {showComposeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">Compose Message</h2>
+            <form onSubmit={handleCompose} className="space-y-3">
+              <input
+                type="email"
+                placeholder="To (email)"
+                value={composeForm.to}
+                onChange={(e) => setComposeForm({ ...composeForm, to: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <input
+                type="text"
+                placeholder="Subject"
+                value={composeForm.subject}
+                onChange={(e) => setComposeForm({ ...composeForm, subject: e.target.value })}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <textarea
+                placeholder="Body"
+                value={composeForm.body}
+                onChange={(e) => setComposeForm({ ...composeForm, body: e.target.value })}
+                required
+                rows={5}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <select
+                value={composeForm.channel}
+                onChange={(e) => setComposeForm({ ...composeForm, channel: e.target.value })}
+                className="w-full rounded border px-3 py-2 text-sm"
+              >
+                <option value="email">Email</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+              </select>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowComposeModal(false)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={composing}>{composing ? "Sending..." : "Send"}</Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

@@ -15,6 +15,9 @@ export default function QuotesPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({ client_id: "", total_amount: "", valid_until: "", notes: "" });
 
   async function fetchQuotes() {
     setLoading(true);
@@ -36,12 +39,82 @@ export default function QuotesPage() {
     fetchQuotes();
   }, [page, statusFilter]);
 
+  async function handleCreateQuote(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.quotes.create({
+        client_id: quoteForm.client_id,
+        total_amount: Number(quoteForm.total_amount),
+        valid_until: quoteForm.valid_until,
+        notes: quoteForm.notes,
+      });
+      setShowModal(false);
+      setQuoteForm({ client_id: "", total_amount: "", valid_until: "", notes: "" });
+      fetchQuotes();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(val);
 
   return (
     <div>
       <Header title="Quotes" />
+
+      <div className="flex justify-end mb-6">
+        <Button size="sm" onClick={() => setShowModal(true)}>+ New Quote</Button>
+      </div>
+
+      {/* New Quote Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">New Quote</h2>
+            <form onSubmit={handleCreateQuote} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Client ID"
+                value={quoteForm.client_id}
+                onChange={(e) => setQuoteForm({ ...quoteForm, client_id: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Total Amount"
+                value={quoteForm.total_amount}
+                onChange={(e) => setQuoteForm({ ...quoteForm, total_amount: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <input
+                type="date"
+                placeholder="Valid Until"
+                value={quoteForm.valid_until}
+                onChange={(e) => setQuoteForm({ ...quoteForm, valid_until: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <textarea
+                placeholder="Notes"
+                value={quoteForm.notes}
+                onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
+                rows={3}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-5 mb-8">

@@ -19,6 +19,7 @@ export default function LeadsPage() {
   const [importResult, setImportResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [generating, setGenerating] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLead, setNewLead] = useState({
     first_name: "",
@@ -67,6 +68,19 @@ export default function LeadsPage() {
       fetchLeads();
     } catch (err: any) {
       setImportResult({ success: false, error: err.message });
+    }
+  }
+
+  async function handleDiscover() {
+    setGenerating(true);
+    try {
+      const result = await api.autopilot.trigger('discover');
+      alert(JSON.stringify(result, null, 2));
+      fetchLeads();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -131,6 +145,9 @@ export default function LeadsPage() {
 
           <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
             + Add Lead
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDiscover} disabled={generating}>
+            {generating ? "Running..." : "Discover Now"}
           </Button>
           <Button
             variant="secondary"

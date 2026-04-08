@@ -29,6 +29,8 @@ export default function SequencesPage() {
     target_industry: "",
   });
 
+  const [generating, setGenerating] = useState(false);
+
   async function fetchSequences() {
     setLoading(true);
     try {
@@ -98,6 +100,19 @@ export default function SequencesPage() {
     }
   }
 
+  async function handleGenerateSequences() {
+    setGenerating(true);
+    try {
+      const result = await api.autopilot.trigger('sequences');
+      alert(JSON.stringify(result, null, 2));
+      fetchSequences();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function handleDuplicate(id: string) {
     try {
       await api.sequences.duplicate(id);
@@ -143,9 +158,14 @@ export default function SequencesPage() {
         <p className="text-sm text-mid-warm">
           {loading ? "Loading..." : `${sequences.length} sequences`}
         </p>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          + New Sequence
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            + New Sequence
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleGenerateSequences} disabled={generating}>
+            {generating ? "Running..." : "Generate Sequences"}
+          </Button>
+        </div>
       </div>
 
       {showCreate && (

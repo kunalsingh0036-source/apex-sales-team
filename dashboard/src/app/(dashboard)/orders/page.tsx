@@ -24,6 +24,9 @@ export default function OrdersPage() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [viewMode, setViewMode] = useState<"kanban" | "table">("kanban");
   const [pipeline, setPipeline] = useState<any>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [orderForm, setOrderForm] = useState({ client_id: "", total_amount: "", priority: "normal", notes: "" });
 
   async function fetchOrders() {
     setLoading(true);
@@ -50,6 +53,26 @@ export default function OrdersPage() {
     fetchOrders();
   }, [page, stageFilter, priorityFilter]);
 
+  async function handleCreateOrder(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.orders.create({
+        client_id: orderForm.client_id,
+        total_amount: Number(orderForm.total_amount),
+        priority: orderForm.priority,
+        notes: orderForm.notes,
+      });
+      setShowModal(false);
+      setOrderForm({ client_id: "", total_amount: "", priority: "normal", notes: "" });
+      fetchOrders();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(val);
 
@@ -61,6 +84,58 @@ export default function OrdersPage() {
   return (
     <div>
       <Header title="Orders" />
+
+      <div className="flex justify-end mb-6">
+        <Button size="sm" onClick={() => setShowModal(true)}>+ New Order</Button>
+      </div>
+
+      {/* New Order Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">New Order</h2>
+            <form onSubmit={handleCreateOrder} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Client ID"
+                value={orderForm.client_id}
+                onChange={(e) => setOrderForm({ ...orderForm, client_id: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Total Amount"
+                value={orderForm.total_amount}
+                onChange={(e) => setOrderForm({ ...orderForm, total_amount: e.target.value })}
+                required
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <select
+                value={orderForm.priority}
+                onChange={(e) => setOrderForm({ ...orderForm, priority: e.target.value })}
+                className="w-full rounded border px-3 py-2 text-sm"
+              >
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+              <textarea
+                placeholder="Notes"
+                value={orderForm.notes}
+                onChange={(e) => setOrderForm({ ...orderForm, notes: e.target.value })}
+                rows={3}
+                className="w-full rounded border px-3 py-2 text-sm"
+              />
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline Summary */}
       {pipeline && (

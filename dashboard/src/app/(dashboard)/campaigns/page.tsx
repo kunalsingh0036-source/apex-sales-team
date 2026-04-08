@@ -30,6 +30,8 @@ export default function CampaignsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", sequence_id: "" });
 
+  const [generating, setGenerating] = useState(false);
+
   async function fetchData() {
     setLoading(true);
     try {
@@ -62,6 +64,19 @@ export default function CampaignsPage() {
       fetchData();
     } catch (err: any) {
       alert("Failed: " + err.message);
+    }
+  }
+
+  async function handleCreateCampaigns() {
+    setGenerating(true);
+    try {
+      const result = await api.autopilot.trigger('campaigns');
+      alert(JSON.stringify(result, null, 2));
+      fetchData();
+    } catch (err: any) {
+      alert("Failed: " + err.message);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -99,9 +114,14 @@ export default function CampaignsPage() {
         <p className="text-sm text-mid-warm">
           {loading ? "Loading..." : `${campaigns.length} campaigns`}
         </p>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          + New Campaign
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            + New Campaign
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleCreateCampaigns} disabled={generating}>
+            {generating ? "Running..." : "Create Campaigns"}
+          </Button>
+        </div>
       </div>
 
       {showCreate && (
