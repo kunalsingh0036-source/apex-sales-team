@@ -385,6 +385,48 @@ class AutomationEngine:
             await self._log_run(db, "campaigns", r)
             return r
 
+        # Map Apollo raw industry names to ICP sequence industry labels
+        INDUSTRY_MAP = {
+            "information technology & services": "Technology & SaaS",
+            "computer software": "Technology & SaaS",
+            "internet": "Technology & SaaS",
+            "computer networking": "Technology & SaaS",
+            "telecommunications": "Technology & SaaS",
+            "financial services": "Banking & Financial Services",
+            "banking": "Banking & Financial Services",
+            "insurance": "Banking & Financial Services",
+            "investment management": "Banking & Financial Services",
+            "pharmaceuticals": "Pharma & Healthcare",
+            "hospital & health care": "Pharma & Healthcare",
+            "medical devices": "Pharma & Healthcare",
+            "biotechnology": "Pharma & Healthcare",
+            "health, wellness & fitness": "Pharma & Healthcare",
+            "food & beverages": "FMCG & Retail",
+            "food production": "FMCG & Retail",
+            "consumer goods": "FMCG & Retail",
+            "retail": "FMCG & Retail",
+            "supermarkets": "FMCG & Retail",
+            "real estate": "Real Estate",
+            "construction": "Real Estate",
+            "building materials": "Real Estate",
+            "civil engineering": "Real Estate",
+            "architecture & planning": "Real Estate",
+            "hospitality": "Hospitality & Luxury Hotels",
+            "leisure, travel & tourism": "Hospitality & Luxury Hotels",
+            "restaurants": "Hospitality & Luxury Hotels",
+            "government administration": "Defence & Government",
+            "defense & space": "Defence & Government",
+            "military": "Defence & Government",
+            "higher education": "Education",
+            "education management": "Education",
+            "e-learning": "Education",
+            "events services": "Events & Activations",
+            "entertainment": "Events & Activations",
+        }
+
+        def normalize_industry(raw: str) -> str:
+            return INDUSTRY_MAP.get(raw.lower().strip(), raw)
+
         # Group by (industry, tier)
         groups: dict[tuple[str, str], list] = {}
         for lead in leads:
@@ -393,7 +435,7 @@ class AutomationEngine:
                 continue
             industry = "Other"
             if lead.company:
-                industry = lead.company.industry or "Other"
+                industry = normalize_industry(lead.company.industry or "Other")
             key = (industry, tier)
             groups.setdefault(key, []).append(lead)
 
