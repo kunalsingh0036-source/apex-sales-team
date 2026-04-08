@@ -26,6 +26,9 @@ if db_url:
     db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
     db_url = db_url.replace("postgresql+aiopg://", "postgresql://")
     config.set_main_option("sqlalchemy.url", db_url)
+    print(f"[alembic] Using DATABASE_URL from env (host: {db_url.split('@')[1].split('/')[0] if '@' in db_url else 'unknown'})")
+else:
+    print("[alembic] WARNING: No DATABASE_URL found in environment, using alembic.ini default")
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
