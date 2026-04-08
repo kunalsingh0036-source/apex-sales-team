@@ -199,7 +199,6 @@ export default function AutopilotPage() {
             {[
               { stage: "discover", label: "Discover Leads" },
               { stage: "enrich", label: "Enrich & Score" },
-              { stage: "sequences", label: "Generate Sequences" },
               { stage: "campaigns", label: "Create Campaigns" },
               { stage: "full", label: "Full Cycle" },
             ].map(({ stage, label }) => (

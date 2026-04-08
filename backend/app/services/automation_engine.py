@@ -366,13 +366,23 @@ class AutomationEngine:
                 )
                 sequence = seq_result.scalar_one_or_none()
                 if not sequence:
-                        continue
-
-                # Verify sequence has actual message content
-                if not sequence.steps or not any(
-                    step.get("body_variants") for step in sequence.steps
-                ):
-                    continue
+                    # Auto-create the universal sequence
+                    sequence = Sequence(
+                        name=f"Autopilot: Universal ({channel})",
+                        description=f"Universal {channel} sequence. Content is AI-generated fresh per lead.",
+                        target_industry="all",
+                        channel=channel,
+                        is_active=True,
+                        steps=[
+                            {"channel": channel, "type": "cold_intro", "delay_days": 0},
+                            {"channel": channel, "type": "follow_up_1", "delay_days": 3},
+                            {"channel": channel, "type": "follow_up_2", "delay_days": 5},
+                            {"channel": channel, "type": "breakup", "delay_days": 7},
+                        ],
+                        settings={"source": "autopilot"},
+                    )
+                    db.add(sequence)
+                    await db.flush()  # get sequence.id
 
                 # Check rate limits before creating
                 remaining = await rate_limiter.remaining(channel)
