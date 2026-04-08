@@ -567,15 +567,9 @@ class AutomationEngine:
             logger.error(f"Autopilot sequences failed: {e}")
             results["sequences"] = {"error": str(e)}
 
-        # Step 4: Campaigns (only on configured day)
+        # Step 4: Campaigns (always run — pipeline refills when approval queue is empty)
         try:
-            settings = await self.get_settings(db)
-            campaign_day = settings.get("campaign_day", 0)
-            today_weekday = datetime.now(IST).weekday()
-            if today_weekday == campaign_day:
-                results["campaigns"] = await self.create_campaigns(db)
-            else:
-                results["campaigns"] = {"skipped": True, "reason": f"not_campaign_day (today={today_weekday}, configured={campaign_day})"}
+            results["campaigns"] = await self.create_campaigns(db)
         except Exception as e:
             logger.error(f"Autopilot campaigns failed: {e}")
             results["campaigns"] = {"error": str(e)}
