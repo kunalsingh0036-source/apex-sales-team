@@ -79,23 +79,26 @@ def send_email(message_id: str):
             )
             lead = lead_result.scalar_one_or_none()
             if not lead or not lead.email:
-                message.status = "failed"
+                message.status = "content_review"
+                message.extra_data = {**message.extra_data, "last_error": "Lead has no email address"}
                 await db.commit()
-                return {"status": "failed", "reason": "no email"}
+                return {"status": "held", "reason": "no email"}
 
             if lead.do_not_contact:
-                message.status = "failed"
+                message.status = "content_review"
+                message.extra_data = {**message.extra_data, "last_error": "Lead is marked do not contact"}
                 await db.commit()
-                return {"status": "failed", "reason": "do_not_contact"}
+                return {"status": "held", "reason": "do_not_contact"}
 
             # Contact guard check
             from app.services.contact_guard import can_contact
             allowed, reason = await can_contact(lead, db)
             if not allowed:
-                message.status = "failed"
+                message.status = "content_review"
+                message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
                 await db.commit()
                 logger.info(f"Contact guard blocked {lead.email}: {reason}")
-                return {"status": "failed", "reason": f"contact_guard: {reason}"}
+                return {"status": "held", "reason": f"contact_guard: {reason}"}
 
             # Content quality gate — reject generic/placeholder messages
             passes, reason = _content_passes_quality(message.subject, message.body)
@@ -137,9 +140,11 @@ def send_email(message_id: str):
                 return {"status": "sent", "gmail_id": gmail_result.get("message_id")}
 
             except Exception as e:
-                message.status = "failed"
+                # Keep in content_review so user can retry
+                message.status = "content_review"
+                message.extra_data = {**message.extra_data, "last_error": f"Send failed: {str(e)}"}
                 await db.commit()
-                return {"status": "failed", "error": str(e)}
+                return {"status": "held", "error": str(e)}
 
     return run_async(_send())
 

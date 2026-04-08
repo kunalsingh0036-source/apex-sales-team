@@ -19,6 +19,7 @@ interface MessageItem {
   ai_suggested_reply: string | null;
   sent_at: string | null;
   created_at: string;
+  extra_data?: { last_error?: string | null };
 }
 
 const CLASSIFICATION_COLORS: Record<string, "success" | "crimson" | "warning" | "info" | "default"> = {
@@ -401,8 +402,15 @@ export default function MessagesPage() {
               </p>
             </div>
 
+            {/* Error reason */}
+            {selectedMessage.extra_data?.last_error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                <span className="font-bold">Issue: </span>{selectedMessage.extra_data.last_error}
+              </div>
+            )}
+
             {/* Approve / Reject / Regenerate for content_review */}
-            {selectedMessage.status === "content_review" && (
+            {(selectedMessage.status === "content_review" || selectedMessage.status === "failed") && (
               <div className="flex gap-2 mb-6">
                 <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
                   {approving ? "Sending..." : "Approve & Send"}

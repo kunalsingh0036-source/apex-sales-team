@@ -217,24 +217,32 @@ async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_
     message = result.scalar_one_or_none()
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
-    if message.status != "content_review":
-        raise HTTPException(status_code=400, detail=f"Message is {message.status}, not content_review")
+    if message.status not in ("content_review", "failed"):
+        raise HTTPException(status_code=400, detail=f"Message is {message.status}, cannot approve")
 
     lead_result = await db.execute(select(Lead).where(Lead.id == message.lead_id))
     lead = lead_result.scalar_one_or_none()
     if not lead or not lead.email:
+        message.extra_data = {**message.extra_data, "last_error": "Lead has no email"}
+        await db.commit()
         raise HTTPException(status_code=400, detail="Lead has no email")
     if lead.do_not_contact:
+        message.extra_data = {**message.extra_data, "last_error": "Lead is marked do_not_contact"}
+        await db.commit()
         raise HTTPException(status_code=400, detail="Lead is do_not_contact")
 
     # Contact guard check
     from app.services.contact_guard import can_contact
     allowed, reason = await can_contact(lead, db)
     if not allowed:
+        message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
+        await db.commit()
         raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
 
     can_send = await rate_limiter.can_send("email")
     if not can_send:
+        message.extra_data = {**message.extra_data, "last_error": "Email daily limit reached"}
+        await db.commit()
         raise HTTPException(status_code=429, detail="Email daily limit reached")
 
     try:
@@ -246,7 +254,12 @@ async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_
         message.status = "sent"
         message.sent_at = datetime.now(timezone.utc)
         message.external_id = gmail_result.get("message_id")
+        message.extra_data = {**message.extra_data, "last_error": None}
         await rate_limiter.record_send("email")
+
+        # Update last_contacted_at
+        from app.services.contact_guard import update_last_contacted
+        await update_last_contacted(lead, db)
 
         activity = Activity(
             lead_id=lead.id,
@@ -258,7 +271,8 @@ async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_
         await db.commit()
         return {"status": "sent", "gmail_id": gmail_result.get("message_id")}
     except Exception as e:
-        message.status = "failed"
+        # Keep in content_review so user can retry — don't mark as failed
+        message.extra_data = {**message.extra_data, "last_error": f"Send failed: {str(e)}"}
         await db.commit()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -312,8 +326,9 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             db.add(activity)
             results.append({"id": str(mid), "status": "sent"})
         except Exception as e:
-            message.status = "failed"
-            results.append({"id": str(mid), "status": "failed", "error": str(e)})
+            # Keep in content_review so user can retry
+            message.extra_data = {**message.extra_data, "last_error": f"Send failed: {str(e)}"}
+            results.append({"id": str(mid), "status": "error", "reason": str(e)})
 
     await db.commit()
     sent_count = sum(1 for r in results if r["status"] == "sent")
