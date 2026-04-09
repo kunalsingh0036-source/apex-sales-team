@@ -17,6 +17,9 @@ async function request<T>(
     throw new Error(error.detail || `API error: ${res.status}`);
   }
 
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    return {} as T;
+  }
   return res.json();
 }
 
