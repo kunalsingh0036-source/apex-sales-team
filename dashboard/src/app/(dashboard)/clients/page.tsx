@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Client, PaginatedResponse, AMA_TIER_LABELS, AMA_TIER_COLORS, AMATier } from "@/lib/types";
 import { clsx } from "clsx";
 
@@ -15,12 +16,13 @@ export default function ClientsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [amaFilter, setAmaFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", company: "", ama_tier: "bronze" });
+  const [form, setForm] = useState({ primary_contact_name: "", primary_contact_email: "", primary_contact_phone: "", primary_contact_title: "", company_name: "", ama_tier: "bronze" });
 
   async function fetchClients() {
     setLoading(true);
@@ -48,12 +50,23 @@ export default function ClientsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.clients.create(form);
+      // Create or find company first
+      const company = await api.companies.create({ name: form.company_name, industry: "" });
+      const companyId = company.id;
+      await api.clients.create({
+        company_id: companyId,
+        primary_contact_name: form.primary_contact_name,
+        primary_contact_email: form.primary_contact_email || undefined,
+        primary_contact_phone: form.primary_contact_phone || undefined,
+        primary_contact_title: form.primary_contact_title || undefined,
+        ama_tier: form.ama_tier,
+      });
       setShowModal(false);
-      setForm({ name: "", email: "", phone: "", company: "", ama_tier: "bronze" });
+      setForm({ primary_contact_name: "", primary_contact_email: "", primary_contact_phone: "", primary_contact_title: "", company_name: "", ama_tier: "bronze" });
+      toast("Client added.", "success");
       fetchClients();
-    } catch (err) {
-      console.error("Failed to create client:", err);
+    } catch (err: any) {
+      toast(err.message, "error");
     } finally {
       setSaving(false);
     }
@@ -201,10 +214,11 @@ export default function ClientsPage() {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold mb-4">Add Client</h2>
             <form onSubmit={handleAddClient} className="space-y-3">
-              <input type="text" placeholder="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="text" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="text" placeholder="Company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Contact Name *" required value={form.primary_contact_name} onChange={(e) => setForm({ ...form, primary_contact_name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="email" placeholder="Email" value={form.primary_contact_email} onChange={(e) => setForm({ ...form, primary_contact_email: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Phone" value={form.primary_contact_phone} onChange={(e) => setForm({ ...form, primary_contact_phone: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Title / Role" value={form.primary_contact_title} onChange={(e) => setForm({ ...form, primary_contact_title: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="Company Name *" required value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
               <select value={form.ama_tier} onChange={(e) => setForm({ ...form, ama_tier: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson">
                 <option value="bronze">Bronze</option>
                 <option value="silver">Silver</option>
