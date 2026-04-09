@@ -1,7 +1,7 @@
 import uuid
 import io
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 import pandas as pd
@@ -146,11 +146,19 @@ async def update_lead(
 
 @router.delete("/{lead_id}")
 async def delete_lead(lead_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    from app.models.activity import Activity
+    from app.models.message import Message
+    from app.models.sequence import CampaignEnrollment
+
     result = await db.execute(select(Lead).where(Lead.id == lead_id))
     lead = result.scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
+    # Delete related records to avoid foreign key constraints
+    await db.execute(delete(Activity).where(Activity.lead_id == lead_id))
+    await db.execute(delete(Message).where(Message.lead_id == lead_id))
+    await db.execute(delete(CampaignEnrollment).where(CampaignEnrollment.lead_id == lead_id))
     await db.delete(lead)
     await db.commit()
     return {"message": "Lead deleted", "success": True}
