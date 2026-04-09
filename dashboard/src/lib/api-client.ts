@@ -14,7 +14,13 @@ async function request<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error: ${res.status}`);
+    const detail = error.detail;
+    const message = typeof detail === "string"
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((d: any) => d.msg || d.message || JSON.stringify(d)).join(", ")
+        : `API error: ${res.status}`;
+    throw new Error(message);
   }
 
   if (res.status === 204 || res.headers.get("content-length") === "0") {
