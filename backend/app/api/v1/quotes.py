@@ -78,6 +78,16 @@ async def update_quote(
     return await quote_service.get_quote(db, quote_id)
 
 
+@router.delete("/{quote_id}", status_code=204)
+async def delete_quote(quote_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    from app.models.quote import Quote
+    quote = await db.get(Quote, quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    await db.delete(quote)
+    await db.commit()
+
+
 @router.post("/{quote_id}/status", response_model=QuoteResponse)
 async def update_quote_status(
     quote_id: uuid.UUID, data: QuoteStatusUpdate,

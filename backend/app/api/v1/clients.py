@@ -84,6 +84,15 @@ async def update_client(
     return client
 
 
+@router.delete("/{client_id}", status_code=204)
+async def delete_client(client_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    client = await db.get(Client, client_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    await db.delete(client)
+    await db.commit()
+
+
 @router.get("/{client_id}/revenue", response_model=dict)
 async def get_client_revenue(
     client_id: uuid.UUID, db: AsyncSession = Depends(get_db),

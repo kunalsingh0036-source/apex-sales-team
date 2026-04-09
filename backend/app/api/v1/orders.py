@@ -82,6 +82,16 @@ async def update_order(
     return await order_service.get_order(db, order_id)
 
 
+@router.delete("/{order_id}", status_code=204)
+async def delete_order(order_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    from app.models.order import Order
+    order = await db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    await db.delete(order)
+    await db.commit()
+
+
 @router.post("/{order_id}/advance-stage", response_model=OrderResponse)
 async def advance_stage(
     order_id: uuid.UUID,
