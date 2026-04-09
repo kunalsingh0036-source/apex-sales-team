@@ -18,7 +18,7 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", sku: "", category: "", base_price: "", moq: "", gsm: "", description: "" });
+  const [form, setForm] = useState({ name: "", sku: "", category_id: "", base_price: "", min_order_qty: "", gsm_range: "", description: "" });
 
   async function fetchData() {
     setLoading(true);
@@ -50,13 +50,16 @@ export default function ProductsPage() {
     setSaving(true);
     try {
       await api.products.create({
-        ...form,
+        name: form.name,
+        sku: form.sku,
+        category_id: form.category_id || undefined,
         base_price: form.base_price ? Number(form.base_price) : undefined,
-        moq: form.moq ? Number(form.moq) : undefined,
-        gsm: form.gsm ? Number(form.gsm) : undefined,
+        min_order_qty: form.min_order_qty ? Number(form.min_order_qty) : undefined,
+        gsm_range: form.gsm_range || undefined,
+        description: form.description,
       });
       setShowModal(false);
-      setForm({ name: "", sku: "", category: "", base_price: "", moq: "", gsm: "", description: "" });
+      setForm({ name: "", sku: "", category_id: "", base_price: "", min_order_qty: "", gsm_range: "", description: "" });
       fetchData();
     } catch (err) {
       console.error("Failed to create product:", err);
@@ -221,10 +224,15 @@ export default function ProductsPage() {
             <form onSubmit={handleAddProduct} className="space-y-3">
               <input type="text" placeholder="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
               <input type="text" placeholder="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="text" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <select value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson">
+                <option value="">Select Category</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
               <input type="number" placeholder="Base Price" value={form.base_price} onChange={(e) => setForm({ ...form, base_price: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="number" placeholder="MOQ" value={form.moq} onChange={(e) => setForm({ ...form, moq: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
-              <input type="number" placeholder="GSM" value={form.gsm} onChange={(e) => setForm({ ...form, gsm: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="number" placeholder="Min Order Qty" value={form.min_order_qty} onChange={(e) => setForm({ ...form, min_order_qty: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="GSM Range (e.g. 180-220)" value={form.gsm_range} onChange={(e) => setForm({ ...form, gsm_range: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
               <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson resize-none" />
               <div className="flex gap-2 justify-end mt-4">
                 <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>

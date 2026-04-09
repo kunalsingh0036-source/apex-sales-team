@@ -21,9 +21,6 @@ interface CampaignItem {
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "" });
-
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
 
@@ -42,18 +39,6 @@ export default function CampaignsPage() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    try {
-      await api.campaigns.create({ name: form.name });
-      setShowCreate(false);
-      setForm({ name: "" });
-      fetchData();
-    } catch (err: any) {
-      toast(err.message, "error");
-    }
-  }
 
   async function handleCreateCampaigns() {
     setGenerating(true);
@@ -103,48 +88,17 @@ export default function CampaignsPage() {
           {loading ? "Loading..." : `${campaigns.length} campaigns`}
         </p>
         <div className="flex items-center gap-3">
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            + New Campaign
-          </Button>
           <Button variant="outline" size="sm" onClick={handleCreateCampaigns} disabled={generating}>
             {generating ? "Running..." : "Create Campaigns"}
           </Button>
         </div>
       </div>
 
-      {showCreate && (
-        <div className="mb-6 bg-white rounded-xl p-6 border border-rich-creme">
-          <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
-            Create Campaign
-          </h3>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <input
-              required
-              placeholder="Campaign name *"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <p className="text-xs text-mid-warm">
-              The campaign will use the universal email sequence. Each message is AI-generated fresh per lead.
-            </p>
-            <div className="flex gap-3">
-              <Button type="submit" size="sm" disabled={!form.name}>
-                Create Campaign
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {!loading && campaigns.length === 0 && (
         <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No campaigns yet</p>
           <p className="text-mid-warm text-sm">
-            Click "Create Campaigns" to auto-generate campaigns from your leads, or create one manually.
+            Click "Create Campaigns" to auto-generate campaigns from your leads.
           </p>
         </div>
       )}

@@ -28,7 +28,7 @@ export default function OrdersPage() {
   const [showModal, setShowModal] = useState(false);
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [orderForm, setOrderForm] = useState({ client_id: "", total_amount: "", priority: "normal", notes: "" });
+  const [orderForm, setOrderForm] = useState({ client_id: "", priority: "normal", notes: "" });
 
   async function fetchOrders() {
     setLoading(true);
@@ -61,12 +61,11 @@ export default function OrdersPage() {
     try {
       await api.orders.create({
         client_id: orderForm.client_id,
-        total_amount: Number(orderForm.total_amount),
         priority: orderForm.priority,
         notes: orderForm.notes,
       });
       setShowModal(false);
-      setOrderForm({ client_id: "", total_amount: "", priority: "normal", notes: "" });
+      setOrderForm({ client_id: "", priority: "normal", notes: "" });
       fetchOrders();
     } catch (err: any) {
       toast(err.message, "error");
@@ -102,14 +101,6 @@ export default function OrdersPage() {
                 placeholder="Client ID"
                 value={orderForm.client_id}
                 onChange={(e) => setOrderForm({ ...orderForm, client_id: e.target.value })}
-                required
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="Total Amount"
-                value={orderForm.total_amount}
-                onChange={(e) => setOrderForm({ ...orderForm, total_amount: e.target.value })}
                 required
                 className="w-full rounded border px-3 py-2 text-sm"
               />

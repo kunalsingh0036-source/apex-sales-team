@@ -48,7 +48,11 @@ export default function MessagesPage() {
   const [loadingReply, setLoadingReply] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composing, setComposing] = useState(false);
-  const [composeForm, setComposeForm] = useState({ to: "", subject: "", body: "", channel: "email" });
+  const [composeForm, setComposeForm] = useState({ lead_id: "", lead_name: "", subject: "", body: "", channel: "email" });
+  const [leadSearch, setLeadSearch] = useState("");
+  const [leadResults, setLeadResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+  const [searchingLeads, setSearchingLeads] = useState(false);
   const { toast } = useToast();
   const [generating, setGenerating] = useState(false);
 
@@ -99,11 +103,22 @@ export default function MessagesPage() {
 
   async function handleCompose(e: React.FormEvent) {
     e.preventDefault();
+    if (!composeForm.lead_id) {
+      toast("Please select a lead", "error");
+      return;
+    }
     setComposing(true);
     try {
-      await api.messages.send(composeForm);
+      await api.messages.send({
+        lead_id: composeForm.lead_id,
+        subject: composeForm.subject,
+        body: composeForm.body,
+        channel: composeForm.channel,
+      });
       setShowComposeModal(false);
-      setComposeForm({ to: "", subject: "", body: "", channel: "email" });
+      setComposeForm({ lead_id: "", lead_name: "", subject: "", body: "", channel: "email" });
+      setLeadSearch("");
+      setLeadResults([]);
       fetchMessages();
     } catch (err: any) {
       toast(err.message, "error");
@@ -111,6 +126,33 @@ export default function MessagesPage() {
       setComposing(false);
     }
   }
+
+  // Debounced lead search
+  useEffect(() => {
+    if (!leadSearch || leadSearch.length < 2) {
+      setLeadResults([]);
+      setShowLeadDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingLeads(true);
+      try {
+        const data = await api.leads.list({ search: leadSearch });
+        const results = (data.items || []).map((l: any) => ({
+          id: l.id,
+          name: l.company_name || l.contact_name || l.id,
+          email: l.email || "",
+        }));
+        setLeadResults(results);
+        setShowLeadDropdown(results.length > 0);
+      } catch {
+        setLeadResults([]);
+      } finally {
+        setSearchingLeads(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [leadSearch]);
 
   async function handleGenerateMessages() {
     setGenerating(true);
@@ -308,14 +350,54 @@ export default function MessagesPage() {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold mb-4">Compose Message</h2>
             <form onSubmit={handleCompose} className="space-y-3">
-              <input
-                type="email"
-                placeholder="To (email)"
-                value={composeForm.to}
-                onChange={(e) => setComposeForm({ ...composeForm, to: e.target.value })}
-                required
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
+              <div className="relative">
+                {composeForm.lead_id ? (
+                  <div className="flex items-center gap-2 w-full rounded border px-3 py-2 text-sm bg-creme/30">
+                    <span className="font-bold text-warm-charcoal">{composeForm.lead_name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setComposeForm({ ...composeForm, lead_id: "", lead_name: "" });
+                        setLeadSearch("");
+                      }}
+                      className="ml-auto text-mid-warm hover:text-crimson text-xs"
+                    >
+                      &times; Change
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Search for a lead..."
+                    value={leadSearch}
+                    onChange={(e) => setLeadSearch(e.target.value)}
+                    className="w-full rounded border px-3 py-2 text-sm"
+                    autoComplete="off"
+                  />
+                )}
+                {showLeadDropdown && !composeForm.lead_id && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-rich-creme rounded shadow-lg max-h-48 overflow-y-auto">
+                    {leadResults.map((lead) => (
+                      <button
+                        key={lead.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-creme/50 transition-colors"
+                        onClick={() => {
+                          setComposeForm({ ...composeForm, lead_id: lead.id, lead_name: lead.name });
+                          setShowLeadDropdown(false);
+                          setLeadSearch("");
+                        }}
+                      >
+                        <span className="font-bold text-warm-charcoal">{lead.name}</span>
+                        {lead.email && <span className="text-mid-warm ml-2">{lead.email}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchingLeads && (
+                  <p className="text-xs text-mid-warm mt-1">Searching...</p>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="Subject"

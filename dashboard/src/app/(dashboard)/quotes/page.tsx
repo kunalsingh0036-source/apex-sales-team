@@ -19,7 +19,7 @@ export default function QuotesPage() {
   const [showModal, setShowModal] = useState(false);
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [quoteForm, setQuoteForm] = useState({ client_id: "", total_amount: "", valid_until: "", notes: "" });
+  const [quoteForm, setQuoteForm] = useState({ client_id: "", valid_from: "", valid_until: "", notes: "" });
 
   async function fetchQuotes() {
     setLoading(true);
@@ -47,12 +47,12 @@ export default function QuotesPage() {
     try {
       await api.quotes.create({
         client_id: quoteForm.client_id,
-        total_amount: Number(quoteForm.total_amount),
+        valid_from: quoteForm.valid_from,
         valid_until: quoteForm.valid_until,
         notes: quoteForm.notes,
       });
       setShowModal(false);
-      setQuoteForm({ client_id: "", total_amount: "", valid_until: "", notes: "" });
+      setQuoteForm({ client_id: "", valid_from: "", valid_until: "", notes: "" });
       fetchQuotes();
     } catch (err: any) {
       toast(err.message, "error");
@@ -78,30 +78,37 @@ export default function QuotesPage() {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold mb-4">New Quote</h2>
             <form onSubmit={handleCreateQuote} className="space-y-3">
-              <input
-                type="text"
-                placeholder="Client ID"
-                value={quoteForm.client_id}
-                onChange={(e) => setQuoteForm({ ...quoteForm, client_id: e.target.value })}
-                required
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
-              <input
-                type="number"
-                placeholder="Total Amount"
-                value={quoteForm.total_amount}
-                onChange={(e) => setQuoteForm({ ...quoteForm, total_amount: e.target.value })}
-                required
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
-              <input
-                type="date"
-                placeholder="Valid Until"
-                value={quoteForm.valid_until}
-                onChange={(e) => setQuoteForm({ ...quoteForm, valid_until: e.target.value })}
-                required
-                className="w-full rounded border px-3 py-2 text-sm"
-              />
+              <div>
+                <label className="block text-xs text-mid-warm mb-1">Client ID (UUID)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+                  value={quoteForm.client_id}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, client_id: e.target.value })}
+                  required
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-mid-warm mb-1">Valid From</label>
+                <input
+                  type="date"
+                  value={quoteForm.valid_from}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, valid_from: e.target.value })}
+                  required
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-mid-warm mb-1">Valid Until</label>
+                <input
+                  type="date"
+                  value={quoteForm.valid_until}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, valid_until: e.target.value })}
+                  required
+                  className="w-full rounded border px-3 py-2 text-sm"
+                />
+              </div>
               <textarea
                 placeholder="Notes"
                 value={quoteForm.notes}
