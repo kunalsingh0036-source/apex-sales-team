@@ -61,6 +61,17 @@ export default function QuotesPage() {
     }
   }
 
+  async function handleDeleteQuote(quote: Quote) {
+    if (!confirm(`Delete quote "${quote.quote_number}"?`)) return;
+    try {
+      await api.quotes.delete(quote.id);
+      toast("Quote deleted", "success");
+      fetchQuotes();
+    } catch (err: any) {
+      toast(err.message || "Failed to delete quote", "error");
+    }
+  }
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(val);
 
@@ -179,13 +190,14 @@ export default function QuotesPage() {
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Total</th>
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Valid Until</th>
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Created</th>
+              <th className="text-right px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-mid-warm">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-mid-warm">Loading...</td></tr>
             ) : quotes.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-mid-warm">No quotes found</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-mid-warm">No quotes found</td></tr>
             ) : (
               quotes.map((quote) => (
                 <tr key={quote.id} className="border-b border-rich-creme/50 hover:bg-creme/20 transition-colors">
@@ -202,6 +214,14 @@ export default function QuotesPage() {
                   <td className="px-4 py-3 font-bold text-warm-charcoal">{formatCurrency(quote.total_amount)}</td>
                   <td className="px-4 py-3 text-mid-warm">{new Date(quote.valid_until).toLocaleDateString("en-IN")}</td>
                   <td className="px-4 py-3 text-mid-warm">{new Date(quote.created_at).toLocaleDateString("en-IN")}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDeleteQuote(quote)}
+                      className="px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

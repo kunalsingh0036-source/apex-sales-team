@@ -74,6 +74,17 @@ export default function OrdersPage() {
     }
   }
 
+  async function handleDeleteOrder(order: Order) {
+    if (!confirm(`Delete order "${order.order_number}"?`)) return;
+    try {
+      await api.orders.delete(order.id);
+      toast("Order deleted", "success");
+      fetchOrders();
+    } catch (err: any) {
+      toast(err.message || "Failed to delete order", "error");
+    }
+  }
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(val);
 
@@ -207,19 +218,28 @@ export default function OrdersPage() {
               </div>
               <div className="bg-gray-50 rounded-b-xl p-2 space-y-2 min-h-[200px]">
                 {ordersByStage[stage].map((order) => (
-                  <Link
+                  <div
                     key={order.id}
-                    href={`/orders/${order.id}`}
-                    className="block bg-white rounded border border-rich-creme p-4 hover:shadow transition-shadow"
+                    className="bg-white rounded border border-rich-creme p-4 hover:shadow transition-shadow"
                   >
-                    <p className="font-bold text-xs text-crimson-dark">{order.order_number}</p>
-                    <p className="text-xs text-mid-warm mt-1">{formatCurrency(order.total_amount)}</p>
-                    {order.priority !== "normal" && (
-                      <Badge variant={order.priority === "urgent" ? "danger" : order.priority === "high" ? "warning" : "default"} className="mt-1">
-                        {order.priority}
-                      </Badge>
-                    )}
-                  </Link>
+                    <Link href={`/orders/${order.id}`} className="block">
+                      <p className="font-bold text-xs text-crimson-dark">{order.order_number}</p>
+                      <p className="text-xs text-mid-warm mt-1">{formatCurrency(order.total_amount)}</p>
+                      {order.priority !== "normal" && (
+                        <Badge variant={order.priority === "urgent" ? "danger" : order.priority === "high" ? "warning" : "default"} className="mt-1">
+                          {order.priority}
+                        </Badge>
+                      )}
+                    </Link>
+                    <div className="mt-2 pt-2 border-t border-rich-creme flex justify-end">
+                      <button
+                        onClick={() => handleDeleteOrder(order)}
+                        className="px-2 py-0.5 text-[10px] font-bold text-red-600 hover:bg-red-50 rounded transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -236,11 +256,12 @@ export default function OrdersPage() {
                 <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Total</th>
                 <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Priority</th>
                 <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Created</th>
+                <th className="text-right px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Actions</th>
               </tr>
             </thead>
             <tbody>
               {orders.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-mid-warm">No orders found</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-mid-warm">No orders found</td></tr>
               ) : orders.map((order) => (
                 <tr key={order.id} className="border-b border-rich-creme/50 hover:bg-creme/20 transition-colors">
                   <td className="px-4 py-3">
@@ -260,6 +281,14 @@ export default function OrdersPage() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-mid-warm">{new Date(order.created_at).toLocaleDateString("en-IN")}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDeleteOrder(order)}
+                      className="px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

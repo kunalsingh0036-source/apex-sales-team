@@ -249,6 +249,8 @@ export const api = {
       request<any>("/clients", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: any) =>
       request<any>(`/clients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      request<any>(`/clients/${id}`, { method: "DELETE" }),
     convertLead: (data: any) =>
       request<any>("/clients/convert-lead", { method: "POST", body: JSON.stringify(data) }),
     revenue: (id: string) => request<any>(`/clients/${id}/revenue`),
@@ -285,6 +287,7 @@ export const api = {
       request<any>(`/orders/${id}/advance-stage`, { method: "POST", body: JSON.stringify(data) }),
     stageHistory: (id: string) => request<any>(`/orders/${id}/stage-history`),
     pipeline: () => request<any>("/orders/pipeline"),
+    delete: (id: string) => request<any>(`/orders/${id}`, { method: "DELETE" }),
   },
 
   // Products
@@ -332,6 +335,7 @@ export const api = {
       request<any>(`/quotes/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
     convertToOrder: (id: string, data: any) =>
       request<any>(`/quotes/${id}/convert-to-order`, { method: "POST", body: JSON.stringify(data) }),
+    delete: (id: string) => request<any>(`/quotes/${id}`, { method: "DELETE" }),
   },
 
   // Revenue

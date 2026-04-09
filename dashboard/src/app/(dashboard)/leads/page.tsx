@@ -69,6 +69,9 @@ export default function LeadsPage() {
     company_sizes: [] as string[],
     keywords: "",
   });
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", email: "", job_title: "", phone: "", department: "" });
+  const [editSaving, setEditSaving] = useState(false);
   const [emailVerify, setEmailVerify] = useState({ email: "", result: null as any, loading: false });
   const [emailFind, setEmailFind] = useState({ domain: "", firstName: "", lastName: "", result: null as any, loading: false });
   const { toast } = useToast();
@@ -149,6 +152,45 @@ export default function LeadsPage() {
         department: "",
         seniority: "",
       });
+      fetchLeads();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  function openEditLead(lead: Lead) {
+    setEditingLead(lead);
+    setEditForm({
+      first_name: lead.first_name,
+      last_name: lead.last_name,
+      email: lead.email || "",
+      job_title: lead.job_title,
+      phone: lead.phone || "",
+      department: lead.department || "",
+    });
+  }
+
+  async function handleEditLead(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingLead) return;
+    setEditSaving(true);
+    try {
+      await api.leads.update(editingLead.id, editForm);
+      toast("Lead updated.", "success");
+      setEditingLead(null);
+      fetchLeads();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteLead(lead: Lead) {
+    if (!confirm(`Delete lead "${lead.full_name}"? This cannot be undone.`)) return;
+    try {
+      await api.leads.delete(lead.id);
+      toast("Lead deleted.", "success");
       fetchLeads();
     } catch (err: any) {
       toast(err.message, "error");
@@ -542,7 +584,69 @@ export default function LeadsPage() {
       </div>
 
       {/* Lead Table */}
-      {!loading && <LeadTable leads={leads} />}
+      {!loading && <LeadTable leads={leads} onEdit={openEditLead} onDelete={handleDeleteLead} />}
+
+      {/* Edit Lead Modal */}
+      {editingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="font-display text-lg font-bold text-crimson-dark mb-4">Edit Lead</h2>
+            <form onSubmit={handleEditLead} className="space-y-3">
+              <input
+                required
+                placeholder="First Name *"
+                value={editForm.first_name}
+                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                required
+                placeholder="Last Name *"
+                value={editForm.last_name}
+                onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                placeholder="Email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                required
+                placeholder="Job Title *"
+                value={editForm.job_title}
+                onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                placeholder="Phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              />
+              <select
+                value={editForm.department}
+                onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+              >
+                <option value="">Department</option>
+                <option value="Procurement">Procurement</option>
+                <option value="HR">HR</option>
+                <option value="Admin">Admin</option>
+                <option value="Marketing">Marketing</option>
+                <option value="C-Suite">C-Suite</option>
+                <option value="Other">Other</option>
+              </select>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setEditingLead(null)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={editSaving}>{editSaving ? "Saving..." : "Save Changes"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

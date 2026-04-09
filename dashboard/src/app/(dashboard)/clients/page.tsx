@@ -23,6 +23,9 @@ export default function ClientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ primary_contact_name: "", primary_contact_email: "", primary_contact_phone: "", primary_contact_title: "", company_name: "", ama_tier: "bronze" });
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editForm, setEditForm] = useState({ primary_contact_name: "", primary_contact_email: "", primary_contact_phone: "", primary_contact_title: "", ama_tier: "bronze" });
+  const [editSaving, setEditSaving] = useState(false);
 
   async function fetchClients() {
     setLoading(true);
@@ -76,6 +79,44 @@ export default function ClientsPage() {
     e.preventDefault();
     setPage(1);
     fetchClients();
+  }
+
+  function openEditClient(client: Client) {
+    setEditingClient(client);
+    setEditForm({
+      primary_contact_name: client.primary_contact_name,
+      primary_contact_email: client.primary_contact_email || "",
+      primary_contact_phone: client.primary_contact_phone || "",
+      primary_contact_title: client.primary_contact_title || "",
+      ama_tier: client.ama_tier || "bronze",
+    });
+  }
+
+  async function handleEditClient(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingClient) return;
+    setEditSaving(true);
+    try {
+      await api.clients.update(editingClient.id, editForm);
+      toast("Client updated.", "success");
+      setEditingClient(null);
+      fetchClients();
+    } catch (err: any) {
+      toast(err.message, "error");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteClient(client: Client) {
+    if (!confirm(`Delete client "${client.primary_contact_name}"? This cannot be undone.`)) return;
+    try {
+      await api.clients.delete(client.id);
+      toast("Client deleted.", "success");
+      fetchClients();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
   }
 
   return (
@@ -146,16 +187,17 @@ export default function ClientsPage() {
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">AMA Tier</th>
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Status</th>
               <th className="text-left px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Created</th>
+              <th className="text-right px-4 py-3 font-label text-xs tracking-wider text-mid-warm uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-mid-warm">Loading...</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-mid-warm">Loading...</td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-mid-warm">No clients found</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-mid-warm">No clients found</td>
               </tr>
             ) : (
               clients.map((client) => (
@@ -185,6 +227,22 @@ export default function ClientsPage() {
                   </td>
                   <td className="px-4 py-3 text-mid-warm">
                     {new Date(client.created_at).toLocaleDateString("en-IN")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openEditClient(client)}
+                        className="text-xs px-2.5 py-1 rounded border border-rich-creme text-crimson-dark hover:bg-creme/50 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClient(client)}
+                        className="text-xs px-2.5 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -228,6 +286,60 @@ export default function ClientsPage() {
               <div className="flex gap-2 justify-end mt-4">
                 <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
                 <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {editingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">Edit Client</h2>
+            <form onSubmit={handleEditClient} className="space-y-3">
+              <input
+                type="text"
+                placeholder="Contact Name *"
+                required
+                value={editForm.primary_contact_name}
+                onChange={(e) => setEditForm({ ...editForm, primary_contact_name: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={editForm.primary_contact_email}
+                onChange={(e) => setEditForm({ ...editForm, primary_contact_email: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                type="text"
+                placeholder="Phone"
+                value={editForm.primary_contact_phone}
+                onChange={(e) => setEditForm({ ...editForm, primary_contact_phone: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson"
+              />
+              <input
+                type="text"
+                placeholder="Title / Role"
+                value={editForm.primary_contact_title}
+                onChange={(e) => setEditForm({ ...editForm, primary_contact_title: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson"
+              />
+              <select
+                value={editForm.ama_tier}
+                onChange={(e) => setEditForm({ ...editForm, ama_tier: e.target.value })}
+                className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson"
+              >
+                <option value="bronze">Bronze</option>
+                <option value="silver">Silver</option>
+                <option value="gold">Gold</option>
+                <option value="institutional">Institutional</option>
+              </select>
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => setEditingClient(null)}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={editSaving}>{editSaving ? "Saving..." : "Save Changes"}</Button>
               </div>
             </form>
           </div>

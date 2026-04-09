@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { api } from "@/lib/api-client";
+import { useToast } from "@/components/ui/Toast";
 import { Product, ProductCategory, PaginatedResponse } from "@/lib/types";
 
 export default function ProductsPage() {
@@ -19,6 +20,10 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", sku: "", category_id: "", base_price: "", min_order_qty: "", gsm_range: "", description: "" });
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", sku: "", category_id: "", base_price: "", min_order_qty: "", gsm_range: "", description: "" });
+  const { toast } = useToast();
 
   async function fetchData() {
     setLoading(true);
@@ -72,6 +77,56 @@ export default function ProductsPage() {
     e.preventDefault();
     setPage(1);
     fetchData();
+  }
+
+  function openEditModal(product: Product) {
+    setEditingProduct(product);
+    setEditForm({
+      name: product.name || "",
+      sku: product.sku || "",
+      category_id: product.category_id || "",
+      base_price: product.base_price != null ? String(product.base_price) : "",
+      min_order_qty: product.min_order_qty != null ? String(product.min_order_qty) : "",
+      gsm_range: product.gsm_range || "",
+      description: product.description || "",
+    });
+    setShowEditModal(true);
+  }
+
+  async function handleEditProduct(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setSaving(true);
+    try {
+      await api.products.update(editingProduct.id, {
+        name: editForm.name,
+        sku: editForm.sku,
+        category_id: editForm.category_id || undefined,
+        base_price: editForm.base_price ? Number(editForm.base_price) : undefined,
+        min_order_qty: editForm.min_order_qty ? Number(editForm.min_order_qty) : undefined,
+        gsm_range: editForm.gsm_range || undefined,
+        description: editForm.description,
+      });
+      setShowEditModal(false);
+      setEditingProduct(null);
+      toast("Product updated successfully", "success");
+      fetchData();
+    } catch (err: any) {
+      toast(err.message || "Failed to update product", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteProduct(product: Product) {
+    if (!confirm(`Delete product "${product.name}"?`)) return;
+    try {
+      await api.products.delete(product.id);
+      toast("Product deleted", "success");
+      fetchData();
+    } catch (err: any) {
+      toast(err.message || "Failed to delete product", "error");
+    }
   }
 
   const formatCurrency = (val: number | null) =>
@@ -200,6 +255,21 @@ export default function ProductsPage() {
                   </div>
                 </div>
               )}
+
+              <div className="mt-3 pt-3 border-t border-rich-creme flex gap-2 justify-end">
+                <button
+                  onClick={() => openEditModal(product)}
+                  className="px-2.5 py-1 text-xs font-bold text-crimson-dark hover:bg-rich-creme rounded transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteProduct(product)}
+                  className="px-2.5 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -237,6 +307,32 @@ export default function ProductsPage() {
               <div className="flex gap-2 justify-end mt-4">
                 <Button variant="outline" size="sm" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
                 <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-bold mb-4">Edit Product</h2>
+            <form onSubmit={handleEditProduct} className="space-y-3">
+              <input type="text" placeholder="Name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="SKU" value={editForm.sku} onChange={(e) => setEditForm({ ...editForm, sku: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <select value={editForm.category_id} onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson">
+                <option value="">Select Category</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+              <input type="number" placeholder="Base Price" value={editForm.base_price} onChange={(e) => setEditForm({ ...editForm, base_price: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="number" placeholder="Min Order Qty" value={editForm.min_order_qty} onChange={(e) => setEditForm({ ...editForm, min_order_qty: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <input type="text" placeholder="GSM Range (e.g. 180-220)" value={editForm.gsm_range} onChange={(e) => setEditForm({ ...editForm, gsm_range: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
+              <textarea placeholder="Description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={3} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson resize-none" />
+              <div className="flex gap-2 justify-end mt-4">
+                <Button variant="outline" size="sm" type="button" onClick={() => { setShowEditModal(false); setEditingProduct(null); }}>Cancel</Button>
+                <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Update"}</Button>
               </div>
             </form>
           </div>

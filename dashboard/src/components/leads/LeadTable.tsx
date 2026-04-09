@@ -33,7 +33,13 @@ function StageBadge({ stage }: { stage: LeadStage }) {
   );
 }
 
-export default function LeadTable({ leads }: { leads: Lead[] }) {
+interface LeadTableProps {
+  leads: Lead[];
+  onEdit?: (lead: Lead) => void;
+  onDelete?: (lead: Lead) => void;
+}
+
+export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
   if (leads.length === 0) {
     return (
       <div className="bg-white rounded-lg p-12 text-center border border-rich-creme">
@@ -68,6 +74,11 @@ export default function LeadTable({ leads }: { leads: Lead[] }) {
             <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
               Source
             </th>
+            {(onEdit || onDelete) && (
+              <th className="text-right px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
+                Actions
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -112,6 +123,28 @@ export default function LeadTable({ leads }: { leads: Lead[] }) {
                   {lead.source}
                 </span>
               </td>
+              {(onEdit || onDelete) && (
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {onEdit && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(lead); }}
+                        className="text-xs px-2.5 py-1 rounded border border-rich-creme text-crimson-dark hover:bg-creme/50 transition-colors"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDelete(lead); }}
+                        className="text-xs px-2.5 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
