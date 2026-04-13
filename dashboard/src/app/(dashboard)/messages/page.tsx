@@ -40,6 +40,7 @@ export default function MessagesPage() {
     channel: "",
     classification: "",
     status: "content_review",
+    emailIssue: "",
   });
   const [approving, setApproving] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
@@ -208,7 +209,7 @@ export default function MessagesPage() {
   }
 
   async function handleApproveAll() {
-    const reviewIds = messages.filter((m) => m.status === "content_review").map((m) => m.id);
+    const reviewIds = filteredMessages.filter((m) => m.status === "content_review" && !m.extra_data?.last_error).map((m) => m.id);
     if (reviewIds.length === 0) return;
     setApprovingAll(true);
     try {
@@ -222,7 +223,12 @@ export default function MessagesPage() {
     }
   }
 
-  const reviewCount = messages.filter((m) => m.status === "content_review").length;
+  const filteredMessages = messages.filter((m) => {
+    if (filter.emailIssue === "ready") return !m.extra_data?.last_error;
+    if (filter.emailIssue === "has_issue") return !!m.extra_data?.last_error;
+    return true;
+  });
+  const reviewCount = filteredMessages.filter((m) => m.status === "content_review").length;
 
   return (
     <div>
@@ -287,13 +293,22 @@ export default function MessagesPage() {
           <option value="ooo">Out of Office</option>
           <option value="unsubscribe">Unsubscribe</option>
         </select>
+        <select
+          value={filter.emailIssue || ""}
+          onChange={(e) => setFilter({ ...filter, emailIssue: e.target.value })}
+          className="px-3 py-2 border border-rich-creme rounded text-sm"
+        >
+          <option value="">All Messages</option>
+          <option value="ready">Ready to Send</option>
+          <option value="has_issue">Has Issues</option>
+        </select>
         <p className="text-sm text-mid-warm self-center ml-auto">
-          {loading ? "Loading..." : `${messages.length} messages`}
+          {loading ? "Loading..." : `${filteredMessages.length} messages`}
         </p>
       </div>
 
       {/* Messages list */}
-      {!loading && messages.length === 0 && (
+      {!loading && filteredMessages.length === 0 && (
         <div className="bg-white rounded-xl p-12 text-center border border-rich-creme">
           <p className="font-display text-xl text-crimson-dark mb-2">No messages yet</p>
           <p className="text-mid-warm text-sm">
@@ -304,7 +319,7 @@ export default function MessagesPage() {
 
       {!loading && messages.length > 0 && (
         <div className="space-y-3">
-          {messages.map((msg) => (
+          {filteredMessages.map((msg) => (
             <div
               key={msg.id}
               className={`bg-white rounded-xl p-6 border cursor-pointer transition-colors ${
