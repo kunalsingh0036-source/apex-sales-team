@@ -167,11 +167,16 @@ export default function MessagesPage() {
     }
   }
 
-  async function handleApprove(id: string) {
+  async function handleApprove(id: string, scheduleAt?: string) {
     setApproving(true);
     try {
-      await api.messages.approve(id);
-      toast("Message approved and sent.", "success");
+      const body = scheduleAt ? { schedule_at: scheduleAt } : undefined;
+      const result = await api.messages.approve(id, body);
+      if (result.status === "scheduled") {
+        toast(`Scheduled for ${new Date(result.scheduled_at).toLocaleString("en-IN")}.`, "success");
+      } else {
+        toast("Message approved and sent.", "success");
+      }
       setSelectedMessage(null);
       fetchMessages();
     } catch (err: any) {
@@ -491,18 +496,48 @@ export default function MessagesPage() {
               </div>
             )}
 
-            {/* Approve / Reject / Regenerate for content_review */}
+            {/* Approve / Schedule / Reject / Regenerate for content_review */}
             {(selectedMessage.status === "content_review" || selectedMessage.status === "failed") && (
-              <div className="flex gap-2 mb-6">
-                <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
-                  {approving ? "Sending..." : "Approve & Send"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => handleRegenerate(selectedMessage.id)}>
-                  Regenerate
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => handleReject(selectedMessage.id)}>
-                  Reject
-                </Button>
+              <div className="mb-6 space-y-3">
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
+                    {approving ? "Sending..." : "Send Now"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    const tomorrow9am = new Date();
+                    tomorrow9am.setDate(tomorrow9am.getDate() + 1);
+                    tomorrow9am.setHours(9, 0, 0, 0);
+                    handleApprove(selectedMessage.id, tomorrow9am.toISOString());
+                  }} disabled={approving}>
+                    Tomorrow 9 AM
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    const in2h = new Date(Date.now() + 2 * 60 * 60 * 1000);
+                    handleApprove(selectedMessage.id, in2h.toISOString());
+                  }} disabled={approving}>
+                    In 2 Hours
+                  </Button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="datetime-local"
+                    className="px-3 py-1.5 border border-rich-creme rounded text-sm"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleApprove(selectedMessage.id, new Date(e.target.value).toISOString());
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-mid-warm">Pick a date and time</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => handleRegenerate(selectedMessage.id)}>
+                    Regenerate
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => handleReject(selectedMessage.id)}>
+                    Reject
+                  </Button>
+                </div>
               </div>
             )}
 

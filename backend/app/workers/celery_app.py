@@ -41,8 +41,10 @@ celery_app.conf.update(
             "task": "app.workers.email_tasks.check_replies",
             "schedule": crontab(minute="*/5"),  # Every 5 minutes
         },
-        # process-scheduled-sends REMOVED — no auto-sending.
-        # Messages go to content_review and must be approved via API.
+        "process-scheduled-sends": {
+            "task": "app.workers.email_tasks.process_scheduled_sends",
+            "schedule": crontab(minute="*/2"),  # Every 2 min — sends approved+scheduled messages when time comes
+        },
         "ensure-review-queue": {
             "task": "app.workers.automation_tasks.ensure_review_queue",
             "schedule": crontab(minute="*/30"),  # Every 30 minutes

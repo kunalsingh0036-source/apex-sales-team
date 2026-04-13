@@ -208,8 +208,8 @@ export const api = {
       request<any>(`/messages/${id}/classify?classification=${classification}`, {
         method: "POST",
       }),
-    approve: (id: string) =>
-      request<any>(`/messages/${id}/approve`, { method: "POST" }),
+    approve: (id: string, data?: any) =>
+      request<any>(`/messages/${id}/approve`, { method: "POST", body: data ? JSON.stringify(data) : undefined }),
     approveBatch: (ids: string[]) =>
       request<any>("/messages/approve-batch", {
         method: "POST",

@@ -1,5 +1,7 @@
 import uuid
+from typing import Optional
 from datetime import datetime, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -210,9 +212,13 @@ async def generate_message(data: GenerateMessageRequest, db: AsyncSession = Depe
     }
 
 
+class ApproveRequest(BaseModel):
+    schedule_at: Optional[datetime] = None
+
+
 @router.post("/{message_id}/approve")
-async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """Approve a content_review message and send it."""
+async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] = None, db: AsyncSession = Depends(get_db)):
+    """Approve a message. If schedule_at is provided, queue for later. Otherwise send now."""
     result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
     if not message:
@@ -238,6 +244,14 @@ async def approve_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_
         message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
         await db.commit()
         raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
+
+    # If schedule_at provided, queue for later instead of sending now
+    if data and data.schedule_at:
+        message.status = "queued"
+        message.scheduled_at = data.schedule_at
+        message.extra_data = {**message.extra_data, "last_error": None, "approved_by": "human"}
+        await db.commit()
+        return {"status": "scheduled", "scheduled_at": data.schedule_at.isoformat()}
 
     can_send = await rate_limiter.can_send("email")
     if not can_send:
