@@ -26,6 +26,7 @@ async def list_leads(
     department: str | None = None,
     min_score: int | None = None,
     source: str | None = None,
+    has_email: bool | None = None,
     search: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -47,6 +48,12 @@ async def list_leads(
     if source:
         query = query.where(Lead.source == source)
         count_query = count_query.where(Lead.source == source)
+    if has_email is True:
+        query = query.where(Lead.email.isnot(None), Lead.email != "")
+        count_query = count_query.where(Lead.email.isnot(None), Lead.email != "")
+    elif has_email is False:
+        query = query.where(or_(Lead.email.is_(None), Lead.email == ""))
+        count_query = count_query.where(or_(Lead.email.is_(None), Lead.email == ""))
     if industry:
         query = query.join(Company).where(Company.industry == industry)
         count_query = count_query.join(Company).where(Company.industry == industry)

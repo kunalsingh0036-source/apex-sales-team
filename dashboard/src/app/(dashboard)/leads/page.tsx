@@ -49,6 +49,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [emailFilter, setEmailFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +92,7 @@ export default function LeadsPage() {
       const params: Record<string, string | number> = { page, per_page: 50 };
       if (search) params.search = search;
       if (stageFilter) params.stage = stageFilter;
+      if (emailFilter) params.has_email = emailFilter;
       const data: PaginatedResponse<Lead> = await api.leads.list(params);
       setLeads(data.items);
       setTotal(data.total);
@@ -104,7 +106,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads();
-  }, [page, stageFilter]);
+  }, [page, stageFilter, emailFilter]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -302,6 +304,19 @@ export default function LeadsPage() {
             <option value="negotiation">Negotiation</option>
             <option value="won">Won</option>
             <option value="lost">Lost</option>
+          </select>
+
+          <select
+            value={emailFilter}
+            onChange={(e) => {
+              setEmailFilter(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 border border-rich-creme rounded text-sm bg-white focus:outline-none focus:border-crimson"
+          >
+            <option value="">All Leads</option>
+            <option value="true">Has Email</option>
+            <option value="false">Missing Email</option>
           </select>
 
           <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>

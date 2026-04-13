@@ -142,11 +142,6 @@ class AutomationEngine:
             email = person.get("email")
             linkedin = person.get("linkedin_url")
 
-            # Skip leads without email — can't do outreach without it
-            if not email:
-                skipped += 1
-                continue
-
             # Deduplicate by email or linkedin_url
             if email:
                 existing = await db.execute(select(Lead.id).where(Lead.email == email))
