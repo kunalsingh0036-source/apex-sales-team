@@ -76,7 +76,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     fetchMessages();
-  }, [filter.direction, filter.channel, filter.classification]);
+  }, [filter.status, filter.direction, filter.channel, filter.classification]);
 
   async function handleSuggestReply(msg: MessageItem) {
     setSelectedMessage(msg);
