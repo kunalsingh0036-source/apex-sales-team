@@ -200,9 +200,42 @@ export default function MessagesPage() {
 
   async function handleRegenerate(id: string) {
     try {
-      await api.messages.regenerate(id);
-      toast("Regenerating message with AI...", "info");
-      setTimeout(() => fetchMessages(), 3000);
+      const result = await api.messages.regenerate(id);
+      toast("Message regenerated.", "success");
+      // Update the selected message with new content
+      if (selectedMessage && selectedMessage.id === id) {
+        setSelectedMessage({
+          ...selectedMessage,
+          subject: result.subject || selectedMessage.subject,
+          body: result.body || selectedMessage.body,
+        });
+      }
+      fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  // Edit message
+  const [editing, setEditing] = useState(false);
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+
+  function startEdit(msg: MessageItem) {
+    setEditSubject(msg.subject || "");
+    setEditBody(msg.body);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit(id: string) {
+    try {
+      await api.messages.update(id, { subject: editSubject, body: editBody });
+      toast("Message updated.", "success");
+      setEditing(false);
+      if (selectedMessage && selectedMessage.id === id) {
+        setSelectedMessage({ ...selectedMessage, subject: editSubject, body: editBody });
+      }
+      fetchMessages();
     } catch (err: any) {
       toast(err.message, "error");
     }
@@ -477,19 +510,48 @@ export default function MessagesPage() {
               </Badge>
             </div>
 
-            {selectedMessage.subject && (
-              <div className="mb-4">
-                <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Subject</p>
-                <p className="text-sm font-bold text-warm-charcoal">{selectedMessage.subject}</p>
+            {editing ? (
+              <div className="mb-4 space-y-3">
+                <div>
+                  <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Subject</p>
+                  <input
+                    type="text"
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                    className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+                  />
+                </div>
+                <div>
+                  <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Body</p>
+                  <textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    rows={12}
+                    className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleSaveEdit(selectedMessage.id)}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                {selectedMessage.subject && (
+                  <div className="mb-4">
+                    <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Subject</p>
+                    <p className="text-sm font-bold text-warm-charcoal">{selectedMessage.subject}</p>
+                  </div>
+                )}
 
-            <div className="mb-4">
-              <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Body</p>
-              <div className="bg-creme/50 rounded p-4 text-sm text-warm-charcoal whitespace-pre-wrap">
-                {selectedMessage.body}
-              </div>
-            </div>
+                <div className="mb-4">
+                  <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Body</p>
+                  <div className="bg-creme/50 rounded p-4 text-sm text-warm-charcoal whitespace-pre-wrap">
+                    {selectedMessage.body}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="mb-4">
               <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Lead ID</p>
@@ -546,7 +608,10 @@ export default function MessagesPage() {
                   />
                   <span className="text-xs text-mid-warm">Pick a date and time</span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => startEdit(selectedMessage)}>
+                    Edit
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => handleRegenerate(selectedMessage.id)}>
                     Regenerate
                   </Button>

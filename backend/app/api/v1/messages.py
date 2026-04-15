@@ -364,6 +364,28 @@ async def reject_message(message_id: uuid.UUID, db: AsyncSession = Depends(get_d
     return {"status": "rejected", "message_id": str(message_id)}
 
 
+class MessageUpdate(BaseModel):
+    subject: Optional[str] = None
+    body: Optional[str] = None
+
+
+@router.patch("/{message_id}")
+async def update_message(message_id: uuid.UUID, data: MessageUpdate, db: AsyncSession = Depends(get_db)):
+    """Edit a message's subject and/or body."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.status not in ("content_review", "draft"):
+        raise HTTPException(status_code=400, detail=f"Cannot edit a {message.status} message")
+    if data.subject is not None:
+        message.subject = data.subject
+    if data.body is not None:
+        message.body = data.body
+    await db.commit()
+    return {"status": "updated", "id": str(message.id), "subject": message.subject, "body": message.body}
+
+
 @router.post("/{message_id}/regenerate")
 async def regenerate_message(
     message_id: uuid.UUID,

@@ -219,6 +219,8 @@ export const api = {
       request<any>(`/messages/${id}/reject`, { method: "POST" }),
     regenerate: (id: string) =>
       request<any>(`/messages/${id}/regenerate`, { method: "POST" }),
+    update: (id: string, data: any) =>
+      request<any>(`/messages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
 
   // Discovery & Enrichment
