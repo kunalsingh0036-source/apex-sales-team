@@ -86,7 +86,7 @@ export default function QuotesPage() {
       {/* New Quote Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">New Quote</h2>
             <form onSubmit={handleCreateQuote} className="space-y-3">
               <div>
@@ -137,7 +137,7 @@ export default function QuotesPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 mb-8">
         <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Quotes</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>

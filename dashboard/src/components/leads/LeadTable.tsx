@@ -52,7 +52,9 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-rich-creme overflow-hidden">
+    <>
+    {/* Desktop table view */}
+    <div className="hidden md:block bg-white rounded-lg border border-rich-creme overflow-hidden">
       <table className="w-full">
         <thead>
           <tr className="border-b border-rich-creme bg-creme/50">
@@ -150,5 +152,30 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
         </tbody>
       </table>
     </div>
+
+    {/* Mobile card view */}
+    <div className="md:hidden space-y-3">
+      {leads.map((lead) => (
+        <div key={lead.id} className="bg-white rounded-lg p-4 border border-rich-creme">
+          <Link href={`/leads/${lead.id}`} className="font-bold text-crimson-dark hover:text-crimson">
+            {lead.full_name}
+          </Link>
+          <p className="text-sm text-warm-charcoal mt-1">{lead.job_title}</p>
+          {lead.company && <p className="text-xs text-mid-warm">{lead.company.name}</p>}
+          <div className="flex items-center gap-2 mt-2">
+            <StageBadge stage={lead.stage} />
+            <span className="text-xs text-mid-warm">Score: {lead.lead_score}</span>
+            <span className="text-xs text-mid-warm">{lead.source}</span>
+          </div>
+          {(onEdit || onDelete) && (
+            <div className="flex gap-2 mt-3 pt-3 border-t border-rich-creme/50">
+              {onEdit && <button onClick={() => onEdit(lead)} className="text-xs text-crimson font-bold">Edit</button>}
+              {onDelete && <button onClick={() => onDelete(lead)} className="text-xs text-red-600 font-bold">Delete</button>}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+    </>
   );
 }

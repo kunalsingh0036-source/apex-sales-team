@@ -104,7 +104,7 @@ export default function OrdersPage() {
       {/* New Order Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">New Order</h2>
             <form onSubmit={handleCreateOrder} className="space-y-3">
               <input
@@ -143,7 +143,7 @@ export default function OrdersPage() {
 
       {/* Pipeline Summary */}
       {pipeline && (
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
           <div className="bg-white rounded-xl border border-rich-creme p-5">
             <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Orders</p>
             <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{pipeline.total_orders}</p>
@@ -210,7 +210,7 @@ export default function OrdersPage() {
         <p className="text-mid-warm text-center py-8">Loading...</p>
       ) : viewMode === "kanban" ? (
         /* Kanban View */
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="hidden md:flex gap-3 overflow-x-auto pb-4">
           {ALL_STAGES.map((stage) => (
             <div key={stage} className="min-w-[240px] flex-1">
               <div className={clsx("rounded-t-xl px-3 py-2 text-xs font-bold", ORDER_STAGE_COLORS[stage])}>

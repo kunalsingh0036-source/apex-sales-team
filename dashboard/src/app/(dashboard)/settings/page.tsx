@@ -38,7 +38,7 @@ export default function SettingsPage() {
             Integration Status
           </h3>
           {config?.integrations ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {Object.entries(config.integrations).map(([name, connected]) => (
                 <div
                   key={name}
@@ -66,7 +66,7 @@ export default function SettingsPage() {
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Daily Rate Limits
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             {config?.rate_limits ? (
               Object.entries(config.rate_limits).map(([channel, limit]) => (
                 <div

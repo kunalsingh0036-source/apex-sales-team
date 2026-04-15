@@ -64,7 +64,7 @@ export default function DashboardPage() {
       <Header title="Dashboard" />
 
       {/* Overview Metrics */}
-      <div className="grid grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-10">
         <MetricCard
           label="Total Leads"
           value={loading ? "..." : String(stats?.total_leads || 0)}
@@ -98,7 +98,7 @@ export default function DashboardPage() {
       </div>
 
       {/* CRM Metrics */}
-      <div className="grid grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-10">
         <MetricCard
           label="Active Clients"
           value={loading ? "..." : String(stats?.total_clients || 0)}
@@ -123,7 +123,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
         {/* Pipeline */}
         <div className="col-span-2 bg-white rounded-xl p-8 shadow-sm border border-rich-creme">
           <h3 className="font-display text-xl font-bold text-crimson-dark mb-6">

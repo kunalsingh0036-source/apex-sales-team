@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
       <Header title="Analytics" />
 
       {/* Period selector */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap gap-2 md:gap-3 mb-6">
         {[7, 14, 30, 90].map((d) => (
           <button
             key={d}
@@ -99,7 +99,7 @@ export default function AnalyticsPage() {
 
       {/* Overview metrics */}
       {overview && (
-        <div className="grid grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-10">
           <MetricCard label="Total Sent" value={String(overview.total_sent)} />
           <MetricCard label="Total Replied" value={String(overview.total_replied)} />
           <MetricCard label="Reply Rate" value={`${overview.reply_rate}%`} accent="text-green-700" />
@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
         {/* Pipeline Funnel */}
         <div className="col-span-2 bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Pipeline Funnel</h3>

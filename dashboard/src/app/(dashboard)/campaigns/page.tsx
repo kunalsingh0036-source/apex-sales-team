@@ -87,7 +87,7 @@ export default function CampaignsPage() {
         <p className="text-sm text-mid-warm">
           {loading ? "Loading..." : `${campaigns.length} campaigns`}
         </p>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           <Button variant="outline" size="sm" onClick={handleCreateCampaigns} disabled={generating}>
             {generating ? "Running..." : "Create Campaigns"}
           </Button>

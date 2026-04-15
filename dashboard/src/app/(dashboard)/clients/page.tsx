@@ -127,7 +127,7 @@ export default function ClientsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
         <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Clients</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>
@@ -269,7 +269,7 @@ export default function ClientsPage() {
       )}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">Add Client</h2>
             <form onSubmit={handleAddClient} className="space-y-3">
               <input type="text" placeholder="Contact Name *" required value={form.primary_contact_name} onChange={(e) => setForm({ ...form, primary_contact_name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
@@ -295,7 +295,7 @@ export default function ClientsPage() {
       {/* Edit Client Modal */}
       {editingClient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">Edit Client</h2>
             <form onSubmit={handleEditClient} className="space-y-3">
               <input

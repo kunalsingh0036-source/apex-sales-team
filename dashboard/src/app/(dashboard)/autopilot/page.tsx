@@ -157,7 +157,7 @@ export default function AutopilotPage() {
         </div>
 
         {/* Status Cards */}
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-5">
           <div className="bg-white rounded-xl p-5 border border-rich-creme text-center overflow-hidden">
             <p className="font-label text-[11px] tracking-[0.12em] text-mid-warm uppercase mb-2">
               Status
@@ -290,7 +290,7 @@ export default function AutopilotPage() {
                 className="w-full px-3 py-2 border border-rich-creme rounded text-sm text-warm-charcoal focus:outline-none focus:border-crimson"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div>
                 <label className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase block mb-1">
                   Locations
@@ -338,7 +338,7 @@ export default function AutopilotPage() {
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Autopilot Settings
           </h3>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
             <div>
               <label className="font-label text-xs tracking-[0.15em] text-mid-warm uppercase block mb-1">
                 Campaign Creation Day

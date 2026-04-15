@@ -235,7 +235,7 @@ export default function MessagesPage() {
       <Header title="Unified Inbox" />
 
       {/* Actions */}
-      <div className="flex gap-2 mb-6 items-center">
+      <div className="flex flex-wrap gap-2 mb-6 items-center">
         <Button size="sm" onClick={() => setShowComposeModal(true)}>Compose</Button>
         <Button variant="outline" size="sm" onClick={handleGenerateMessages} disabled={generating}>
           {generating ? "Running..." : "Generate Messages"}
@@ -248,7 +248,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 mb-8 flex-wrap">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-6 md:mb-8 flex-wrap">
         <select
           value={filter.status}
           onChange={(e) => setFilter({ ...filter, status: e.target.value })}
@@ -367,7 +367,7 @@ export default function MessagesPage() {
       {/* Compose Modal */}
       {showComposeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">Compose Message</h2>
             <form onSubmit={handleCompose} className="space-y-3">
               <div className="relative">
@@ -454,8 +454,9 @@ export default function MessagesPage() {
 
       {/* Detail panel */}
       {selectedMessage && (
-        <div className="fixed inset-y-0 right-0 w-[520px] max-w-[60vw] bg-white shadow-xl border-l border-rich-creme z-50 overflow-y-auto">
+        <div className="fixed inset-0 md:inset-y-0 md:right-0 md:left-auto w-full md:w-[520px] md:max-w-[60vw] bg-white shadow-xl border-l border-rich-creme z-50 overflow-y-auto">
           <div className="p-8">
+            <button onClick={() => { setSelectedMessage(null); setSuggestedReply(null); }} className="md:hidden text-sm text-crimson mb-4">&larr; Back to messages</button>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-display text-lg font-bold text-crimson-dark">Message Detail</h3>
               <button
@@ -514,7 +515,7 @@ export default function MessagesPage() {
             {/* Approve / Schedule / Reject / Regenerate for content_review */}
             {(selectedMessage.status === "content_review" || selectedMessage.status === "failed") && (
               <div className="mb-6 space-y-3">
-                <div className="flex gap-2">
+                <div className="flex flex-col md:flex-row gap-2">
                   <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
                     {approving ? "Sending..." : "Send Now"}
                   </Button>

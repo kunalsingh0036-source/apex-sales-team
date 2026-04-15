@@ -145,7 +145,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 mb-8">
         <div className="bg-white rounded-xl border border-rich-creme p-5">
           <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Total Products</p>
           <p className="font-display text-2xl font-bold text-crimson-dark mt-1">{total}</p>
@@ -192,7 +192,7 @@ export default function ProductsPage() {
       ) : products.length === 0 ? (
         <p className="text-mid-warm text-center py-8">No products found</p>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {products.map((product) => (
             <div key={product.id} className="bg-white rounded-xl border border-rich-creme p-5 hover:shadow transition-shadow">
               <div className="flex items-start justify-between mb-2">
@@ -289,7 +289,7 @@ export default function ProductsPage() {
       )}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">Add Product</h2>
             <form onSubmit={handleAddProduct} className="space-y-3">
               <input type="text" placeholder="Name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />
@@ -315,7 +315,7 @@ export default function ProductsPage() {
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="text-lg font-bold mb-4">Edit Product</h2>
             <form onSubmit={handleEditProduct} className="space-y-3">
               <input type="text" placeholder="Name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-3 py-2 rounded border border-rich-creme text-sm focus:outline-none focus:border-crimson" />

@@ -24,12 +24,18 @@ const bottomItems = [
   { href: "/settings", label: "Settings", icon: "⚙" },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-60 bg-crimson-dark text-creme flex flex-col">
-      <div className="p-6 border-b border-crimson">
+    <>
+      {isOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={onClose} />}
+      <aside className={clsx(
+        "fixed left-0 top-0 h-screen w-60 bg-crimson-dark text-creme flex flex-col -translate-x-full md:translate-x-0 transition-transform duration-200 z-50",
+        isOpen && "translate-x-0"
+      )}>
+      <div className="p-6 border-b border-crimson relative">
+        <button onClick={onClose} className="md:hidden text-creme text-xl absolute top-4 right-4">&times;</button>
         <h1 className="font-display text-lg font-bold tracking-wide">
           THE APEX HUMAN
         </h1>
@@ -49,6 +55,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-3 px-6 py-3 text-sm transition-colors",
                 isActive
@@ -73,6 +80,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-3 px-6 py-3 text-sm transition-colors",
                 isActive
@@ -94,6 +102,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-3 px-6 py-3 text-sm transition-colors",
                 isActive
@@ -116,5 +125,6 @@ export default function Sidebar() {
         </p>
       </div>
     </aside>
+    </>
   );
 }

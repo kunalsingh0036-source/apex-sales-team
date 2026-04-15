@@ -272,7 +272,7 @@ export default function LeadsPage() {
       <Header title="Leads" />
 
       {/* Controls */}
-      <div className="flex items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6 gap-3 md:gap-4">
         <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-lg">
           <input
             type="text"
@@ -286,7 +286,7 @@ export default function LeadsPage() {
           </Button>
         </form>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           <select
             value={stageFilter}
             onChange={(e) => {
@@ -377,7 +377,7 @@ export default function LeadsPage() {
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
             Add New Lead
           </h3>
-          <form onSubmit={handleAddLead} className="grid grid-cols-2 gap-5">
+          <form onSubmit={handleAddLead} className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <input
               required
               placeholder="First Name *"
@@ -477,7 +477,7 @@ export default function LeadsPage() {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
                 <div>
                   <label className="font-label text-xs tracking-wider text-mid-warm uppercase block mb-1">Location</label>
                   <input value={discoveryForm.locations.join(", ")} onChange={(e) => setDiscoveryForm({ ...discoveryForm, locations: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} placeholder="India, Mumbai" className="w-full px-3 py-2 border border-rich-creme rounded text-sm" />
@@ -494,7 +494,7 @@ export default function LeadsPage() {
                   <input value={discoveryForm.keywords} onChange={(e) => setDiscoveryForm({ ...discoveryForm, keywords: e.target.value })} placeholder="corporate gifting, apparel" className="w-full px-3 py-2 border border-rich-creme rounded text-sm" />
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2 md:gap-3">
                 <Button size="sm" onClick={handleDiscoverySearch} disabled={discoverySearching}>{discoverySearching ? "Searching..." : "Search Apollo.io"}</Button>
                 <Button size="sm" variant="outline" onClick={handleDiscoveryImport} disabled={discoveryImporting}>{discoveryImporting ? "Importing..." : "Bulk Import (up to 100)"}</Button>
                 <Button size="sm" variant="outline" onClick={() => api.discovery.batchScore()}>Score All Unscored</Button>
@@ -537,7 +537,7 @@ export default function LeadsPage() {
             )}
 
             {/* Email Tools */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div className="bg-white rounded-xl p-5 border border-rich-creme">
                 <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Email Verification (Hunter.io)</h3>
                 <div className="flex gap-2 mb-2">
@@ -553,7 +553,7 @@ export default function LeadsPage() {
               </div>
               <div className="bg-white rounded-xl p-5 border border-rich-creme">
                 <h3 className="font-label text-xs tracking-wider text-mid-warm uppercase mb-3">Email Finder (Hunter.io)</h3>
-                <div className="grid grid-cols-3 gap-2 mb-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
                   <input value={emailFind.domain} onChange={(e) => setEmailFind({ ...emailFind, domain: e.target.value })} placeholder="company.com" className="px-3 py-2 border border-rich-creme rounded text-sm" />
                   <input value={emailFind.firstName} onChange={(e) => setEmailFind({ ...emailFind, firstName: e.target.value })} placeholder="First name" className="px-3 py-2 border border-rich-creme rounded text-sm" />
                   <input value={emailFind.lastName} onChange={(e) => setEmailFind({ ...emailFind, lastName: e.target.value })} placeholder="Last name" className="px-3 py-2 border border-rich-creme rounded text-sm" />
@@ -604,7 +604,7 @@ export default function LeadsPage() {
       {/* Edit Lead Modal */}
       {editingLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
             <h2 className="font-display text-lg font-bold text-crimson-dark mb-4">Edit Lead</h2>
             <form onSubmit={handleEditLead} className="space-y-3">
               <input
