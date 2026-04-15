@@ -221,6 +221,15 @@ export const api = {
       request<any>(`/messages/${id}/regenerate`, { method: "POST" }),
     update: (id: string, data: any) =>
       request<any>(`/messages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    uploadAttachments: async (id: string, files: File[]) => {
+      const form = new FormData();
+      files.forEach((f) => form.append("files", f));
+      const res = await fetch(`${API_BASE}/messages/${id}/attachments`, { method: "POST", body: form });
+      if (!res.ok) { const err = await res.json().catch(() => ({ detail: res.statusText })); throw new Error(typeof err.detail === "string" ? err.detail : "Upload failed"); }
+      return res.json();
+    },
+    removeAttachment: (id: string, filename: string) =>
+      request<any>(`/messages/${id}/attachments/${encodeURIComponent(filename)}`, { method: "DELETE" }),
   },
 
   // Discovery & Enrichment

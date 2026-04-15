@@ -4,8 +4,11 @@ Uses OAuth2 credentials for authentication.
 """
 
 import base64
+import mimetypes
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import Optional
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -40,18 +43,36 @@ class GmailService:
         body: str,
         html_body: Optional[str] = None,
         reply_to: Optional[str] = None,
+        attachments: Optional[list[dict]] = None,
     ) -> dict:
         """Send an email via Gmail API.
+
+        Args:
+            attachments: list of {"filename": str, "content": bytes, "content_type": str}
 
         Returns dict with message_id and thread_id.
         """
         settings = get_settings()
         sender = settings.gmail_sender_email
 
-        if html_body:
-            message = MIMEMultipart("alternative")
-            message.attach(MIMEText(body, "plain"))
-            message.attach(MIMEText(html_body, "html"))
+        if attachments or html_body:
+            message = MIMEMultipart("mixed")
+            if html_body:
+                alt = MIMEMultipart("alternative")
+                alt.attach(MIMEText(body, "plain"))
+                alt.attach(MIMEText(html_body, "html"))
+                message.attach(alt)
+            else:
+                message.attach(MIMEText(body, "plain"))
+
+            for att in (attachments or []):
+                mime_type = att.get("content_type", "application/octet-stream")
+                maintype, subtype = mime_type.split("/", 1) if "/" in mime_type else ("application", "octet-stream")
+                part = MIMEBase(maintype, subtype)
+                part.set_payload(att["content"])
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment", filename=att["filename"])
+                message.attach(part)
         else:
             message = MIMEText(body, "plain")
 

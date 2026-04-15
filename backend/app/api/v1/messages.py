@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -212,6 +212,60 @@ async def generate_message(data: GenerateMessageRequest, db: AsyncSession = Depe
     }
 
 
+@router.post("/{message_id}/attachments")
+async def upload_attachment(
+    message_id: uuid.UUID,
+    files: list[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload file attachments to a message. Files are stored in message extra_data."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.status not in ("content_review", "draft"):
+        raise HTTPException(status_code=400, detail=f"Cannot add attachments to a {message.status} message")
+
+    import base64
+    attachments = message.extra_data.get("attachments", [])
+    for f in files:
+        content = await f.read()
+        if len(content) > 10 * 1024 * 1024:  # 10MB limit per file
+            raise HTTPException(status_code=400, detail=f"File {f.filename} exceeds 10MB limit")
+        attachments.append({
+            "filename": f.filename,
+            "content_type": f.content_type or "application/octet-stream",
+            "size": len(content),
+            "data": base64.b64encode(content).decode(),
+        })
+
+    message.extra_data = {**message.extra_data, "attachments": attachments}
+    await db.commit()
+    return {
+        "status": "uploaded",
+        "attachments": [{"filename": a["filename"], "size": a["size"], "content_type": a["content_type"]} for a in attachments],
+    }
+
+
+@router.delete("/{message_id}/attachments/{filename}")
+async def remove_attachment(
+    message_id: uuid.UUID,
+    filename: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove an attachment from a message."""
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    attachments = message.extra_data.get("attachments", [])
+    attachments = [a for a in attachments if a["filename"] != filename]
+    message.extra_data = {**message.extra_data, "attachments": attachments}
+    await db.commit()
+    return {"status": "removed", "remaining": len(attachments)}
+
+
 class ApproveRequest(BaseModel):
     schedule_at: Optional[datetime] = None
 
@@ -260,10 +314,16 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
         raise HTTPException(status_code=429, detail="Email daily limit reached")
 
     try:
+        # Build attachments from stored data
+        import base64 as b64
+        stored_atts = message.extra_data.get("attachments", [])
+        atts = [{"filename": a["filename"], "content": b64.b64decode(a["data"]), "content_type": a["content_type"]} for a in stored_atts] if stored_atts else None
+
         gmail_result = await gmail_service.send_email(
             to=lead.email,
             subject=message.subject or "The Apex Human Company",
             body=message.body,
+            attachments=atts,
         )
         message.status = "sent"
         message.sent_at = datetime.now(timezone.utc)

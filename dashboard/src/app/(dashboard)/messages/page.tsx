@@ -19,7 +19,7 @@ interface MessageItem {
   ai_suggested_reply: string | null;
   sent_at: string | null;
   created_at: string;
-  extra_data?: { last_error?: string | null };
+  extra_data?: { last_error?: string | null; attachments?: { filename: string; size: number; content_type: string }[] };
 }
 
 const CLASSIFICATION_COLORS: Record<string, "success" | "crimson" | "warning" | "info" | "default"> = {
@@ -236,6 +236,36 @@ export default function MessagesPage() {
         setSelectedMessage({ ...selectedMessage, subject: editSubject, body: editBody });
       }
       fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function handleFileUpload(msgId: string, files: FileList | null) {
+    if (!files || files.length === 0) return;
+    try {
+      const result = await api.messages.uploadAttachments(msgId, Array.from(files));
+      toast(`${files.length} file(s) attached.`, "success");
+      if (selectedMessage && selectedMessage.id === msgId) {
+        setSelectedMessage({
+          ...selectedMessage,
+          extra_data: { ...selectedMessage.extra_data, attachments: result.attachments },
+        });
+      }
+      fetchMessages();
+    } catch (err: any) {
+      toast(err.message, "error");
+    }
+  }
+
+  async function handleRemoveAttachment(msgId: string, filename: string) {
+    try {
+      await api.messages.removeAttachment(msgId, filename);
+      toast("Attachment removed.", "info");
+      if (selectedMessage && selectedMessage.id === msgId) {
+        const atts = (selectedMessage.extra_data?.attachments || []).filter((a) => a.filename !== filename);
+        setSelectedMessage({ ...selectedMessage, extra_data: { ...selectedMessage.extra_data, attachments: atts } });
+      }
     } catch (err: any) {
       toast(err.message, "error");
     }
@@ -552,6 +582,47 @@ export default function MessagesPage() {
                 </div>
               </>
             )}
+
+            {/* Attachments */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-label text-xs tracking-wider text-mid-warm uppercase">Attachments</p>
+                {(selectedMessage.status === "content_review" || selectedMessage.status === "draft") && (
+                  <label className="text-xs text-crimson font-bold cursor-pointer hover:text-crimson-dark">
+                    + Add File
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(selectedMessage.id, e.target.files)}
+                    />
+                  </label>
+                )}
+              </div>
+              {(selectedMessage.extra_data?.attachments || []).length > 0 ? (
+                <div className="space-y-2">
+                  {selectedMessage.extra_data!.attachments!.map((att) => (
+                    <div key={att.filename} className="flex items-center justify-between bg-creme/50 rounded px-3 py-2 text-sm">
+                      <div>
+                        <span className="font-bold text-warm-charcoal">{att.filename}</span>
+                        <span className="text-xs text-mid-warm ml-2">{(att.size / 1024).toFixed(0)} KB</span>
+                      </div>
+                      {(selectedMessage.status === "content_review" || selectedMessage.status === "draft") && (
+                        <button
+                          onClick={() => handleRemoveAttachment(selectedMessage.id, att.filename)}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-mid-warm">No attachments</p>
+              )}
+            </div>
 
             <div className="mb-4">
               <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Lead ID</p>
