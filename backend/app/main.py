@@ -150,6 +150,16 @@ async def health_check():
     except Exception:
         checks["redis"] = "error"
 
+    # Brief attachment file check
+    try:
+        from app.services.email_service import _BRIEF_PATH
+        if _BRIEF_PATH.exists():
+            checks["brief_attachment"] = {"status": "ok", "size_bytes": _BRIEF_PATH.stat().st_size}
+        else:
+            checks["brief_attachment"] = {"status": "missing", "path": str(_BRIEF_PATH)}
+    except Exception as e:
+        checks["brief_attachment"] = {"status": "error", "error": str(e)}
+
     all_ok = checks.get("database") == "ok" and checks.get("redis") == "ok"
     checks["status"] = "healthy" if all_ok else "degraded"
     return checks
