@@ -600,28 +600,35 @@ export default function MessagesPage() {
                   </label>
                 )}
               </div>
-              {(selectedMessage.extra_data?.attachments || []).length > 0 ? (
-                <div className="space-y-2">
-                  {selectedMessage.extra_data!.attachments!.map((att) => (
-                    <div key={att.filename} className="flex items-center justify-between bg-creme/50 rounded px-3 py-2 text-sm">
-                      <div>
-                        <span className="font-bold text-warm-charcoal">{att.filename}</span>
-                        <span className="text-xs text-mid-warm ml-2">{(att.size / 1024).toFixed(0)} KB</span>
-                      </div>
-                      {(selectedMessage.status === "content_review" || selectedMessage.status === "draft") && (
-                        <button
-                          onClick={() => handleRemoveAttachment(selectedMessage.id, att.filename)}
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      )}
+              <div className="space-y-2">
+                {/* System-attached brief — always present on every outgoing email */}
+                {selectedMessage.channel === "email" && selectedMessage.direction === "outbound" && (
+                  <div className="flex items-center justify-between bg-crimson/5 border border-crimson/20 rounded px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <span className="font-bold text-crimson-dark">📎 Apex Human Brief</span>
+                      <span className="text-xs text-mid-warm ml-2">Always attached · 163 KB · PDF</span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-mid-warm">No attachments</p>
-              )}
+                    <span className="text-[10px] tracking-wider text-mid-warm uppercase italic shrink-0 ml-2">System</span>
+                  </div>
+                )}
+
+                {(selectedMessage.extra_data?.attachments || []).map((att) => (
+                  <div key={att.filename} className="flex items-center justify-between bg-creme/50 rounded px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <span className="font-bold text-warm-charcoal">{att.filename}</span>
+                      <span className="text-xs text-mid-warm ml-2">{(att.size / 1024).toFixed(0)} KB</span>
+                    </div>
+                    {(selectedMessage.status === "content_review" || selectedMessage.status === "draft") && (
+                      <button
+                        onClick={() => handleRemoveAttachment(selectedMessage.id, att.filename)}
+                        className="text-xs text-red-600 hover:text-red-800 shrink-0 ml-2"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mb-4">

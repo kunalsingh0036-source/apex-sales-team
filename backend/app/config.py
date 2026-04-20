@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     gmail_refresh_token: str = ""
     gmail_sender_email: str = "brand@apexhumancompany.com"
 
+    # Brief attachment (attached to every outgoing email)
+    brief_attachment_enabled: bool = True
+    brief_attachment_display_name: str = "The Apex Human Company — Brief.pdf"
+
     # API Security
     api_secret_key: str = "change-this-to-a-random-secret"
 

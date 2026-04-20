@@ -381,15 +381,25 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             continue
 
         try:
+            # Load user-uploaded attachments from extra_data (brief is auto-added by email_service)
+            import base64 as b64
+            stored_atts = message.extra_data.get("attachments", [])
+            atts = [{"filename": a["filename"], "content": b64.b64decode(a["data"]), "content_type": a["content_type"]} for a in stored_atts] if stored_atts else None
+
             gmail_result = await gmail_service.send_email(
                 to=lead.email,
                 subject=message.subject or "The Apex Human Company",
                 body=message.body,
+                attachments=atts,
             )
             message.status = "sent"
             message.sent_at = datetime.now(timezone.utc)
             message.external_id = gmail_result.get("message_id")
             await rate_limiter.record_send("email")
+
+            # Mark lead as contacted
+            from app.services.contact_guard import update_last_contacted
+            await update_last_contacted(lead, db)
 
             activity = Activity(
                 lead_id=lead.id,

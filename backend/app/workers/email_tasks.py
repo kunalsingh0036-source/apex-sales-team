@@ -115,10 +115,16 @@ def send_email(message_id: str):
                 return {"status": "rate_limited"}
 
             try:
+                # Load user-uploaded attachments (brief is auto-appended by email_service)
+                import base64 as b64
+                stored_atts = message.extra_data.get("attachments", []) if message.extra_data else []
+                atts = [{"filename": a["filename"], "content": b64.b64decode(a["data"]), "content_type": a["content_type"]} for a in stored_atts] if stored_atts else None
+
                 gmail_result = await gmail_service.send_email(
                     to=lead.email,
                     subject=message.subject or "The Apex Human Company",
                     body=message.body,
+                    attachments=atts,
                 )
 
                 message.status = "sent"

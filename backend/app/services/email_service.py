@@ -4,15 +4,22 @@ Uses OAuth2 credentials for authentication.
 """
 
 import base64
+import logging
 import mimetypes
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from pathlib import Path
 from typing import Optional
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Brief PDF lives at backend/app/assets/apex_human_brief_final.pdf
+_BRIEF_PATH = Path(__file__).resolve().parent.parent / "assets" / "apex_human_brief_final.pdf"
 
 
 class GmailService:
@@ -55,7 +62,27 @@ class GmailService:
         settings = get_settings()
         sender = settings.gmail_sender_email
 
-        if attachments or html_body:
+        # Merge caller-provided attachments with the permanent brief PDF.
+        # The brief is attached to every outgoing email unless disabled in config.
+        final_attachments = list(attachments or [])
+        if settings.brief_attachment_enabled and _BRIEF_PATH.exists():
+            already_attached = any(
+                a.get("filename") == settings.brief_attachment_display_name
+                for a in final_attachments
+            )
+            if not already_attached:
+                try:
+                    final_attachments.append({
+                        "filename": settings.brief_attachment_display_name,
+                        "content": _BRIEF_PATH.read_bytes(),
+                        "content_type": "application/pdf",
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to load brief attachment from {_BRIEF_PATH}: {e}")
+        elif settings.brief_attachment_enabled:
+            logger.warning(f"brief_attachment_enabled=True but file missing at {_BRIEF_PATH}")
+
+        if final_attachments or html_body:
             message = MIMEMultipart("mixed")
             if html_body:
                 alt = MIMEMultipart("alternative")
@@ -65,7 +92,7 @@ class GmailService:
             else:
                 message.attach(MIMEText(body, "plain"))
 
-            for att in (attachments or []):
+            for att in final_attachments:
                 mime_type = att.get("content_type", "application/octet-stream")
                 maintype, subtype = mime_type.split("/", 1) if "/" in mime_type else ("application", "octet-stream")
                 part = MIMEBase(maintype, subtype)
