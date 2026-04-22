@@ -300,3 +300,37 @@ async def list_enrollments(
         per_page=per_page,
         total_pages=(total + per_page - 1) // per_page,
     )
+
+
+@router.post("/enrollments/{enrollment_id}/force-advance")
+async def force_advance_enrollment(
+    enrollment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bump an enrollment's next_step_at to now and advance it immediately.
+    Useful when the team wants to push a lead forward without waiting for the scheduled delay,
+    or for QA/testing to verify the next step in the sequence.
+    """
+    result = await db.execute(
+        select(CampaignEnrollment).where(CampaignEnrollment.id == enrollment_id)
+    )
+    enrollment = result.scalar_one_or_none()
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found")
+    if enrollment.status != "active":
+        raise HTTPException(status_code=400, detail=f"Enrollment is {enrollment.status}, cannot advance")
+
+    # Bump next_step_at to now so advance_enrollment will process it
+    enrollment.next_step_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    prev_step = enrollment.current_step
+    advanced = await orchestrator.advance_enrollment(enrollment, db)
+    await db.commit()
+    return {
+        "status": "advanced" if advanced else "skipped",
+        "enrollment_id": str(enrollment.id),
+        "previous_step": prev_step,
+        "current_step": enrollment.current_step,
+        "next_step_at": enrollment.next_step_at.isoformat() if enrollment.next_step_at else None,
+    }
