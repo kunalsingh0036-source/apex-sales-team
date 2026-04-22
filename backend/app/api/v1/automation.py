@@ -100,7 +100,7 @@ async def autopilot_history(
 @router.post("/trigger/{stage}")
 async def trigger_stage(stage: str, db: AsyncSession = Depends(get_db)):
     """Manually trigger an autopilot stage."""
-    valid_stages = ["discover", "enrich", "sequences", "campaigns", "full"]
+    valid_stages = ["discover", "enrich", "sequences", "campaigns", "advance", "full"]
     if stage not in valid_stages:
         raise HTTPException(status_code=400, detail=f"Invalid stage. Must be one of: {valid_stages}")
 
