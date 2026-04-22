@@ -33,7 +33,7 @@ async def list_messages(
     classification: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Message).options(selectinload(Message.lead))
+    query = select(Message).join(Lead, Message.lead_id == Lead.id).options(selectinload(Message.lead))
     count_query = select(func.count()).select_from(Message)
 
     if lead_id:
@@ -54,7 +54,10 @@ async def list_messages(
 
     total = (await db.execute(count_query)).scalar() or 0
     offset = (page - 1) * per_page
-    query = query.order_by(Message.created_at.desc()).offset(offset).limit(per_page)
+    # Primary sort: lead_number ASC so the team sees L-0001, L-0002, L-0003...
+    # Secondary sort: created_at DESC so when one lead has multiple messages,
+    # the most recent is shown first within that lead's group.
+    query = query.order_by(Lead.lead_number.asc(), Message.created_at.desc()).offset(offset).limit(per_page)
     result = await db.execute(query)
     items = result.scalars().all()
 
@@ -84,15 +87,29 @@ async def pending_replies(db: AsyncSession = Depends(get_db)):
     """Get inbound messages that need human attention."""
     result = await db.execute(
         select(Message)
+        .join(Lead, Message.lead_id == Lead.id)
+        .options(selectinload(Message.lead))
         .where(
             Message.direction == "inbound",
             Message.classification.in_(["interested", "meeting_request", "requesting_info"]),
         )
-        .order_by(Message.created_at.desc())
+        .order_by(Lead.lead_number.asc(), Message.created_at.desc())
         .limit(50)
     )
     items = result.scalars().all()
-    return [MessageResponse.model_validate(m) for m in items]
+    out = []
+    for m in items:
+        resp = MessageResponse.model_validate(m)
+        if m.lead is not None:
+            resp.lead = MessageLeadSummary(
+                id=m.lead.id,
+                lead_code=m.lead.lead_code,
+                full_name=m.lead.full_name,
+                email=m.lead.email,
+                job_title=m.lead.job_title,
+            )
+        out.append(resp)
+    return out
 
 
 @router.post("/retry-failed")
