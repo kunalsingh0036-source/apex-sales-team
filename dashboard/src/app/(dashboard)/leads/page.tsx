@@ -50,6 +50,7 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,6 +106,7 @@ export default function LeadsPage() {
       if (search) params.search = search;
       if (stageFilter) params.stage = stageFilter;
       if (emailFilter) params.has_email = emailFilter;
+      if (sortOrder) params.sort = sortOrder;
       const data: PaginatedResponse<Lead> = await api.leads.list(params);
       setLeads(data.items);
       setTotal(data.total);
@@ -118,7 +120,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads();
-  }, [page, stageFilter, emailFilter]);
+  }, [page, stageFilter, emailFilter, sortOrder]);
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -363,6 +365,21 @@ export default function LeadsPage() {
             <option value="">All Leads</option>
             <option value="true">Has Email</option>
             <option value="false">Missing Email</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => {
+              setSortOrder(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 border border-rich-creme rounded text-sm bg-white focus:outline-none focus:border-crimson"
+          >
+            <option value="">Sort: Score</option>
+            <option value="number_asc">Sort: # asc (L-0001 first)</option>
+            <option value="number_desc">Sort: # desc (newest #)</option>
+            <option value="created_desc">Sort: Newest first</option>
+            <option value="created_asc">Sort: Oldest first</option>
           </select>
 
           <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>

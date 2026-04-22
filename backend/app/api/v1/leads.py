@@ -28,6 +28,10 @@ async def list_leads(
     source: str | None = None,
     has_email: bool | None = None,
     search: str | None = None,
+    sort: str | None = Query(
+        None,
+        description="Sort order: score_desc (default), number_asc, number_desc, created_asc, created_desc",
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Lead).options(selectinload(Lead.company))
@@ -63,13 +67,26 @@ async def list_leads(
             Lead.last_name.ilike(f"%{search}%"),
             Lead.email.ilike(f"%{search}%"),
             Lead.job_title.ilike(f"%{search}%"),
+            Lead.lead_code.ilike(f"%{search}%"),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
     total = (await db.execute(count_query)).scalar() or 0
     offset = (page - 1) * per_page
-    query = query.order_by(Lead.lead_score.desc(), Lead.created_at.desc())
+
+    # Sort selection — default remains score-first for backwards compat
+    if sort == "number_asc":
+        query = query.order_by(Lead.lead_number.asc())
+    elif sort == "number_desc":
+        query = query.order_by(Lead.lead_number.desc())
+    elif sort == "created_asc":
+        query = query.order_by(Lead.created_at.asc())
+    elif sort == "created_desc":
+        query = query.order_by(Lead.created_at.desc())
+    else:
+        query = query.order_by(Lead.lead_score.desc(), Lead.created_at.desc())
+
     query = query.offset(offset).limit(per_page)
     result = await db.execute(query)
     items = result.scalars().all()
@@ -341,6 +358,8 @@ async def get_lead_profile(
     return {
         "lead": {
             "id": str(lead.id),
+            "lead_number": lead.lead_number,
+            "lead_code": lead.lead_code,
             "first_name": lead.first_name,
             "last_name": lead.last_name,
             "full_name": lead.full_name,

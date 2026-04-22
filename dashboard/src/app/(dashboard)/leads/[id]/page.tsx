@@ -62,6 +62,8 @@ type ProfileActivity = {
 
 type ProfileLead = {
   id: string;
+  lead_number: number;
+  lead_code: string;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -215,6 +217,9 @@ export default function LeadDetailPage() {
         </button>
         <h2 className="font-display text-2xl md:text-3xl font-bold text-crimson-dark break-words">
           {lead.full_name}
+          {lead.lead_code && (
+            <span className="ml-3 font-mono text-base md:text-lg text-mid-warm font-normal">· {lead.lead_code}</span>
+          )}
         </h2>
       </div>
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, date, timezone
 from typing import Optional
-from sqlalchemy import String, Text, Integer, Boolean, Numeric, Date, DateTime, ForeignKey, ARRAY
+from sqlalchemy import String, Text, Integer, BigInteger, Boolean, Numeric, Date, DateTime, ForeignKey, ARRAY, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import Base, UUIDMixin, TimestampMixin
@@ -27,6 +27,24 @@ class Company(Base, UUIDMixin, TimestampMixin):
 
 class Lead(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "leads"
+
+    # Human-readable sequential identifier. Populated by the lead_number_seq
+    # sequence + DB trigger (see migration 005_numbering). Never recycled —
+    # if a lead is deleted, the number stays retired.
+    lead_number: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        unique=True,
+        server_default=text("nextval('lead_number_seq'::regclass)"),
+    )
+    lead_code: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        index=True,
+        # Populated by the leads_set_code DB trigger; safe placeholder for
+        # new INSERTs in tests/without-trigger contexts.
+        server_default=text("''"),
+    )
 
     company_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id")

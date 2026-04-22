@@ -96,6 +96,8 @@ class LeadUpdate(BaseModel):
 
 class LeadResponse(BaseModel):
     id: uuid.UUID
+    lead_number: int
+    lead_code: str
     company_id: Optional[uuid.UUID]
     first_name: str
     last_name: str

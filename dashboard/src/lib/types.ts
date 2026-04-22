@@ -16,6 +16,8 @@ export interface Company {
 
 export interface Lead {
   id: string;
+  lead_number: number;
+  lead_code: string;
   company_id: string | null;
   first_name: string;
   last_name: string;

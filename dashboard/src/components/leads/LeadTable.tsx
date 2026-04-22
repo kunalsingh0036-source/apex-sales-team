@@ -59,6 +59,9 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
         <thead>
           <tr className="border-b border-rich-creme bg-creme/50">
             <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
+              #
+            </th>
+            <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
               Name
             </th>
             <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
@@ -89,6 +92,9 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
               key={lead.id}
               className="border-b border-rich-creme/50 hover:bg-creme/30 transition-colors"
             >
+              <td className="px-4 py-3 font-mono text-xs text-mid-warm whitespace-nowrap">
+                {lead.lead_code}
+              </td>
               <td className="px-4 py-3">
                 <Link
                   href={`/leads/${lead.id}`}
@@ -157,9 +163,12 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
     <div className="md:hidden space-y-3">
       {leads.map((lead) => (
         <div key={lead.id} className="bg-white rounded-lg p-4 border border-rich-creme">
-          <Link href={`/leads/${lead.id}`} className="font-bold text-crimson-dark hover:text-crimson">
-            {lead.full_name}
-          </Link>
+          <div className="flex items-start justify-between gap-2">
+            <Link href={`/leads/${lead.id}`} className="font-bold text-crimson-dark hover:text-crimson">
+              {lead.full_name}
+            </Link>
+            <span className="font-mono text-xs text-mid-warm shrink-0">{lead.lead_code}</span>
+          </div>
           <p className="text-sm text-warm-charcoal mt-1">{lead.job_title}</p>
           {lead.company && <p className="text-xs text-mid-warm">{lead.company.name}</p>}
           <div className="flex items-center gap-2 mt-2">
