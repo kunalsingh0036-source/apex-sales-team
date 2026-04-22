@@ -71,7 +71,13 @@ export default function LeadsPage() {
     keywords: "",
   });
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [editForm, setEditForm] = useState({ first_name: "", last_name: "", email: "", job_title: "", phone: "", department: "" });
+  const [editForm, setEditForm] = useState({
+    first_name: "", last_name: "", email: "", job_title: "",
+    phone: "", whatsapp_number: "", linkedin_url: "",
+    department: "", seniority: "", city: "", state: "", country: "India",
+    stage: "prospect", notes: "",
+    consent_status: "unknown", do_not_contact: false,
+  });
   const [editSaving, setEditSaving] = useState(false);
   const [emailVerify, setEmailVerify] = useState({ email: "", result: null as any, loading: false });
   const [emailFind, setEmailFind] = useState({ domain: "", firstName: "", lastName: "", result: null as any, loading: false });
@@ -82,8 +88,14 @@ export default function LeadsPage() {
     email: "",
     job_title: "",
     phone: "",
+    whatsapp_number: "",
+    linkedin_url: "",
     department: "",
     seniority: "",
+    city: "",
+    state: "",
+    country: "India",
+    notes: "",
   });
 
   async function fetchLeads() {
@@ -143,16 +155,25 @@ export default function LeadsPage() {
   async function handleAddLead(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await api.leads.create(newLead);
+      // Strip empty strings for optional fields so backend gets null rather than ""
+      const payload: Record<string, any> = {};
+      for (const [k, v] of Object.entries(newLead)) {
+        if (typeof v === "string") {
+          const trimmed = v.trim();
+          if (trimmed) payload[k] = trimmed;
+        } else if (v !== undefined && v !== null) {
+          payload[k] = v;
+        }
+      }
+      await api.leads.create(payload);
+      toast("Lead added.", "success");
       setShowAddForm(false);
       setNewLead({
-        first_name: "",
-        last_name: "",
-        email: "",
-        job_title: "",
-        phone: "",
-        department: "",
-        seniority: "",
+        first_name: "", last_name: "", email: "", job_title: "",
+        phone: "", whatsapp_number: "", linkedin_url: "",
+        department: "", seniority: "",
+        city: "", state: "", country: "India",
+        notes: "",
       });
       fetchLeads();
     } catch (err: any) {
@@ -168,7 +189,17 @@ export default function LeadsPage() {
       email: lead.email || "",
       job_title: lead.job_title,
       phone: lead.phone || "",
+      whatsapp_number: (lead as any).whatsapp_number || "",
+      linkedin_url: (lead as any).linkedin_url || "",
       department: lead.department || "",
+      seniority: (lead as any).seniority || "",
+      city: (lead as any).city || "",
+      state: (lead as any).state || "",
+      country: (lead as any).country || "India",
+      stage: (lead as any).stage || "prospect",
+      notes: (lead as any).notes || "",
+      consent_status: (lead as any).consent_status || "unknown",
+      do_not_contact: Boolean((lead as any).do_not_contact),
     });
   }
 
@@ -177,7 +208,22 @@ export default function LeadsPage() {
     if (!editingLead) return;
     setEditSaving(true);
     try {
-      await api.leads.update(editingLead.id, editForm);
+      // Send empty strings for optional fields as null so they clear properly
+      const payload: Record<string, any> = {};
+      for (const [k, v] of Object.entries(editForm)) {
+        if (typeof v === "string") {
+          const trimmed = v.trim();
+          // Required fields that must stay as strings
+          if (["first_name", "last_name", "job_title", "country", "stage", "consent_status", "notes"].includes(k)) {
+            payload[k] = trimmed;
+          } else {
+            payload[k] = trimmed || null;
+          }
+        } else {
+          payload[k] = v;
+        }
+      }
+      await api.leads.update(editingLead.id, payload);
       toast("Lead updated.", "success");
       setEditingLead(null);
       fetchLeads();
@@ -374,69 +420,67 @@ export default function LeadsPage() {
       {/* Add Lead Form */}
       {showAddForm && (
         <div className="mb-6 bg-white rounded-xl p-6 border border-rich-creme">
-          <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
-            Add New Lead
-          </h3>
-          <form onSubmit={handleAddLead} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <input
-              required
-              placeholder="First Name *"
-              value={newLead.first_name}
-              onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <input
-              required
-              placeholder="Last Name *"
-              value={newLead.last_name}
-              onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <input
-              placeholder="Email"
-              type="email"
-              value={newLead.email}
-              onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <input
-              required
-              placeholder="Job Title *"
-              value={newLead.job_title}
-              onChange={(e) => setNewLead({ ...newLead, job_title: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <input
-              placeholder="Phone"
-              value={newLead.phone}
-              onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            />
-            <select
-              value={newLead.department}
-              onChange={(e) => setNewLead({ ...newLead, department: e.target.value })}
-              className="px-3 py-2 border border-rich-creme rounded text-sm"
-            >
-              <option value="">Department</option>
-              <option value="Procurement">Procurement</option>
-              <option value="HR">HR</option>
-              <option value="Admin">Admin</option>
-              <option value="Marketing">Marketing</option>
-              <option value="C-Suite">C-Suite</option>
-              <option value="Other">Other</option>
-            </select>
-            <div className="col-span-2 flex gap-3">
-              <Button type="submit" size="sm">
-                Save Lead
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddForm(false)}
-              >
-                Cancel
-              </Button>
+          <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">Add New Lead</h3>
+          <form onSubmit={handleAddLead} className="space-y-4">
+            <div>
+              <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Identity</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input required placeholder="First Name *" value={newLead.first_name} onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input required placeholder="Last Name *" value={newLead.last_name} onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input required placeholder="Job Title *" value={newLead.job_title} onChange={(e) => setNewLead({ ...newLead, job_title: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm md:col-span-2" />
+              </div>
+            </div>
+
+            <div>
+              <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Contact</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <input type="email" placeholder="Email" value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input placeholder="Phone" value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input placeholder="WhatsApp Number" value={newLead.whatsapp_number} onChange={(e) => setNewLead({ ...newLead, whatsapp_number: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input placeholder="LinkedIn URL" value={newLead.linkedin_url} onChange={(e) => setNewLead({ ...newLead, linkedin_url: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+              </div>
+            </div>
+
+            <div>
+              <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Role & Location</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <select value={newLead.department} onChange={(e) => setNewLead({ ...newLead, department: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm">
+                  <option value="">Department</option>
+                  <option value="Procurement">Procurement</option>
+                  <option value="HR">HR</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="C-Suite">C-Suite</option>
+                  <option value="Other">Other</option>
+                </select>
+                <select value={newLead.seniority} onChange={(e) => setNewLead({ ...newLead, seniority: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm">
+                  <option value="">Seniority</option>
+                  <option value="c_suite">C-Suite</option>
+                  <option value="vp">VP</option>
+                  <option value="director">Director</option>
+                  <option value="manager">Manager</option>
+                  <option value="individual_contributor">Individual Contributor</option>
+                </select>
+                <input placeholder="City" value={newLead.city} onChange={(e) => setNewLead({ ...newLead, city: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input placeholder="State" value={newLead.state} onChange={(e) => setNewLead({ ...newLead, state: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm" />
+                <input placeholder="Country" value={newLead.country} onChange={(e) => setNewLead({ ...newLead, country: e.target.value })} className="px-3 py-2 border border-rich-creme rounded text-sm md:col-span-2" />
+              </div>
+            </div>
+
+            <div>
+              <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Notes</p>
+              <textarea
+                placeholder="Internal notes"
+                value={newLead.notes}
+                onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-rich-creme rounded text-sm"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2 border-t border-rich-creme">
+              <Button type="submit" size="sm">Save Lead</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>Cancel</Button>
             </div>
           </form>
         </div>
@@ -603,58 +647,93 @@ export default function LeadsPage() {
 
       {/* Edit Lead Modal */}
       {editingLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0">
-            <h2 className="font-display text-lg font-bold text-crimson-dark mb-4">Edit Lead</h2>
-            <form onSubmit={handleEditLead} className="space-y-3">
-              <input
-                required
-                placeholder="First Name *"
-                value={editForm.first_name}
-                onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              />
-              <input
-                required
-                placeholder="Last Name *"
-                value={editForm.last_name}
-                onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              />
-              <input
-                placeholder="Email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              />
-              <input
-                required
-                placeholder="Job Title *"
-                value={editForm.job_title}
-                onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              />
-              <input
-                placeholder="Phone"
-                value={editForm.phone}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              />
-              <select
-                value={editForm.department}
-                onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
-              >
-                <option value="">Department</option>
-                <option value="Procurement">Procurement</option>
-                <option value="HR">HR</option>
-                <option value="Admin">Admin</option>
-                <option value="Marketing">Marketing</option>
-                <option value="C-Suite">C-Suite</option>
-                <option value="Other">Other</option>
-              </select>
-              <div className="flex gap-2 justify-end mt-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-y-auto p-0 md:p-6">
+          <div className="w-full max-w-2xl rounded-none md:rounded-xl bg-white p-4 md:p-6 shadow-xl min-h-screen md:min-h-0 my-0 md:my-4">
+            <h2 className="font-display text-lg font-bold text-crimson-dark mb-4">Edit Lead — {editingLead.full_name}</h2>
+            <form onSubmit={handleEditLead} className="space-y-4">
+              <div>
+                <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Identity</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input required placeholder="First Name *" value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input required placeholder="Last Name *" value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input required placeholder="Job Title *" value={editForm.job_title} onChange={(e) => setEditForm({ ...editForm, job_title: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson md:col-span-2" />
+                </div>
+              </div>
+
+              <div>
+                <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Contact</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input placeholder="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input placeholder="WhatsApp Number" value={editForm.whatsapp_number} onChange={(e) => setEditForm({ ...editForm, whatsapp_number: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input placeholder="LinkedIn URL" value={editForm.linkedin_url} onChange={(e) => setEditForm({ ...editForm, linkedin_url: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                </div>
+              </div>
+
+              <div>
+                <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Role & Location</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <select value={editForm.department} onChange={(e) => setEditForm({ ...editForm, department: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson">
+                    <option value="">Department</option>
+                    <option value="Procurement">Procurement</option>
+                    <option value="HR">HR</option>
+                    <option value="Admin">Admin</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="C-Suite">C-Suite</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <select value={editForm.seniority} onChange={(e) => setEditForm({ ...editForm, seniority: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson">
+                    <option value="">Seniority</option>
+                    <option value="c_suite">C-Suite</option>
+                    <option value="vp">VP</option>
+                    <option value="director">Director</option>
+                    <option value="manager">Manager</option>
+                    <option value="individual_contributor">Individual Contributor</option>
+                  </select>
+                  <input placeholder="City" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input placeholder="State" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson" />
+                  <input placeholder="Country" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson md:col-span-2" />
+                </div>
+              </div>
+
+              <div>
+                <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Pipeline & Consent</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <select value={editForm.stage} onChange={(e) => setEditForm({ ...editForm, stage: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson">
+                    <option value="prospect">Prospect</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="engaged">Engaged</option>
+                    <option value="qualified">Qualified</option>
+                    <option value="proposal_sent">Proposal Sent</option>
+                    <option value="negotiation">Negotiation</option>
+                    <option value="won">Won</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                  <select value={editForm.consent_status} onChange={(e) => setEditForm({ ...editForm, consent_status: e.target.value })} className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson">
+                    <option value="unknown">Consent: Unknown</option>
+                    <option value="opted_in">Opted In</option>
+                    <option value="opted_out">Opted Out</option>
+                    <option value="invalid_email">Invalid Email</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 mt-3 text-sm text-warm-charcoal">
+                  <input type="checkbox" checked={editForm.do_not_contact} onChange={(e) => setEditForm({ ...editForm, do_not_contact: e.target.checked })} className="w-4 h-4 accent-crimson" />
+                  Do not contact this lead
+                </label>
+              </div>
+
+              <div>
+                <p className="font-label text-[10px] tracking-wider text-mid-warm uppercase mb-2">Notes</p>
+                <textarea
+                  placeholder="Internal notes"
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2 border-t border-rich-creme">
                 <Button variant="outline" size="sm" type="button" onClick={() => setEditingLead(null)}>Cancel</Button>
                 <Button size="sm" type="submit" disabled={editSaving}>{editSaving ? "Saving..." : "Save Changes"}</Button>
               </div>

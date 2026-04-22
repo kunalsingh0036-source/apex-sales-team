@@ -90,6 +90,7 @@ class LeadUpdate(BaseModel):
     lost_reason: Optional[str] = None
     tags: Optional[list[str]] = None
     notes: Optional[str] = None
+    consent_status: Optional[str] = None
     do_not_contact: Optional[bool] = None
 
 

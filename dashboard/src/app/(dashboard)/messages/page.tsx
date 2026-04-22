@@ -45,6 +45,8 @@ export default function MessagesPage() {
   const [approving, setApproving] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<MessageItem | null>(null);
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [editEmail, setEditEmail] = useState("");
   const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [loadingReply, setLoadingReply] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
@@ -77,6 +79,26 @@ export default function MessagesPage() {
   useEffect(() => {
     fetchMessages();
   }, [filter.status, filter.direction, filter.channel, filter.classification]);
+
+  // Load lead details when a message is selected
+  useEffect(() => {
+    if (!selectedMessage?.lead_id) {
+      setSelectedLead(null);
+      setEditEmail("");
+      return;
+    }
+    let cancelled = false;
+    api.leads.get(selectedMessage.lead_id)
+      .then((lead: any) => {
+        if (cancelled) return;
+        setSelectedLead(lead);
+        setEditEmail(lead?.email || "");
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedLead(null);
+      });
+    return () => { cancelled = true; };
+  }, [selectedMessage?.lead_id]);
 
   async function handleSuggestReply(msg: MessageItem) {
     setSelectedMessage(msg);
@@ -230,7 +252,17 @@ export default function MessagesPage() {
   async function handleSaveEdit(id: string) {
     try {
       await api.messages.update(id, { subject: editSubject, body: editBody });
-      toast("Message updated.", "success");
+
+      // If email changed, also update the lead record (so the message is sent to the corrected address)
+      const emailChanged = selectedLead && editEmail.trim() !== (selectedLead.email || "").trim();
+      if (emailChanged && selectedLead) {
+        await api.leads.update(selectedLead.id, { email: editEmail.trim() || null });
+        setSelectedLead({ ...selectedLead, email: editEmail.trim() });
+        toast("Message and lead email updated.", "success");
+      } else {
+        toast("Message updated.", "success");
+      }
+
       setEditing(false);
       if (selectedMessage && selectedMessage.id === id) {
         setSelectedMessage({ ...selectedMessage, subject: editSubject, body: editBody });
@@ -543,6 +575,17 @@ export default function MessagesPage() {
             {editing ? (
               <div className="mb-4 space-y-3">
                 <div>
+                  <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">To (email)</p>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="recipient@company.com"
+                    className="w-full px-3 py-2 border border-rich-creme rounded text-sm focus:outline-none focus:border-crimson font-mono"
+                  />
+                  <p className="text-[11px] text-mid-warm mt-1">Updating this will change the lead's email on record.</p>
+                </div>
+                <div>
                   <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Subject</p>
                   <input
                     type="text"
@@ -567,6 +610,20 @@ export default function MessagesPage() {
               </div>
             ) : (
               <>
+                {selectedLead && (
+                  <div className="mb-4">
+                    <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">To</p>
+                    <p className="text-sm text-warm-charcoal">
+                      <span className="font-bold">{selectedLead.first_name} {selectedLead.last_name}</span>
+                      {selectedLead.email ? (
+                        <span className="text-mid-warm font-mono ml-2">&lt;{selectedLead.email}&gt;</span>
+                      ) : (
+                        <span className="text-red-700 ml-2 italic text-xs">(no email on record)</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 {selectedMessage.subject && (
                   <div className="mb-4">
                     <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Subject</p>
@@ -633,7 +690,10 @@ export default function MessagesPage() {
 
             <div className="mb-4">
               <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Lead ID</p>
-              <p className="text-sm font-mono text-warm-charcoal">{selectedMessage.lead_id}</p>
+              <p className="text-sm font-mono text-warm-charcoal break-all">{selectedMessage.lead_id}</p>
+              {selectedLead?.email && (
+                <p className="text-xs font-mono text-mid-warm mt-1 break-all">{selectedLead.email}</p>
+              )}
             </div>
 
             <div className="mb-4">
