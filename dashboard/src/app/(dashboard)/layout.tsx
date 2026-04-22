@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
+import GlobalSearch from "@/components/layout/GlobalSearch";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export default function DashboardLayout({
@@ -18,6 +19,9 @@ export default function DashboardLayout({
         <div className="md:hidden flex items-center gap-3 mb-4">
           <button onClick={() => setSidebarOpen(true)} className="text-crimson-dark text-2xl">&#9776;</button>
           <h1 className="font-display text-lg font-bold text-crimson-dark">APEX HUMAN</h1>
+        </div>
+        <div className="mb-6 flex justify-end">
+          <GlobalSearch />
         </div>
         {children}
       </main>

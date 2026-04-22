@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from app.api.v1 import leads, companies, sequences, campaigns, templates, messages, dashboard, webhooks, discovery, analytics, settings, automation
-from app.api.v1 import clients, orders, products, quotes, revenue
+from app.api.v1 import clients, orders, products, quotes, revenue, search
 
 api_router = APIRouter()
 
+api_router.include_router(search.router, prefix="/search", tags=["Search"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads"])
 api_router.include_router(companies.router, prefix="/companies", tags=["Companies"])

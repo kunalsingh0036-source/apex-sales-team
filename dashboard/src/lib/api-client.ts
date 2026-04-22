@@ -412,4 +412,14 @@ export const api = {
     leadScores: () => request<any[]>("/analytics/lead-scores"),
     aiInsights: () => request<any>("/analytics/ai-insights"),
   },
+
+  // Global search
+  search: {
+    global: (q: string, limit = 8) =>
+      request<{
+        query: string;
+        total: number;
+        results: Record<string, { id: string; title: string; subtitle: string; url: string; lead_code?: string }[]>;
+      }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  },
 };
