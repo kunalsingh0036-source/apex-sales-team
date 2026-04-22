@@ -121,6 +121,10 @@ def send_linkedin_message(message_id: str):
                     await rate_limiter.record_send("linkedin")
                     await update_last_contacted(lead, db)
 
+                    # Drip: schedule the next sequence step based on this real sent_at
+                    from app.services.outreach_orchestrator import orchestrator
+                    await orchestrator.schedule_next_step_after_send(message, db)
+
                     activity = Activity(
                         lead_id=lead.id,
                         type=f"linkedin_{msg_type}_sent",

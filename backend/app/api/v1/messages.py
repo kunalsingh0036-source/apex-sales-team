@@ -407,6 +407,10 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
         from app.services.contact_guard import update_last_contacted
         await update_last_contacted(lead, db)
 
+        # Drip: schedule the next sequence step based on this real sent_at
+        from app.services.outreach_orchestrator import orchestrator
+        await orchestrator.schedule_next_step_after_send(message, db)
+
         activity = Activity(
             lead_id=lead.id,
             type="email_sent",
@@ -500,6 +504,10 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             # Mark lead as contacted
             from app.services.contact_guard import update_last_contacted
             await update_last_contacted(lead, db)
+
+            # Drip: schedule the next sequence step based on this real sent_at
+            from app.services.outreach_orchestrator import orchestrator
+            await orchestrator.schedule_next_step_after_send(message, db)
 
             activity = Activity(
                 lead_id=lead.id,

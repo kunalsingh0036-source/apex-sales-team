@@ -137,6 +137,10 @@ def send_email(message_id: str):
                 from app.services.contact_guard import update_last_contacted
                 await update_last_contacted(lead, db)
 
+                # Drip: schedule the next sequence step based on this real sent_at
+                from app.services.outreach_orchestrator import orchestrator
+                await orchestrator.schedule_next_step_after_send(message, db)
+
                 activity = Activity(
                     lead_id=lead.id,
                     type="email_sent",

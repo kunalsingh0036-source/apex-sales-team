@@ -43,6 +43,30 @@ class OutreachOrchestrator:
             enrollment.status = "completed"
             return False
 
+        # DRIP GATE: If there's already an outbound message for this enrollment that
+        # hasn't been sent yet (still in review / draft / queued / failed), don't
+        # generate the next step. Wait for the prior step to actually go out first —
+        # otherwise step N+1's content references an email that may still be edited
+        # or rejected. The next_step_at is set to None so the worker won't re-pick
+        # this enrollment until `schedule_next_step_after_send` reschedules it.
+        prior_msg_q = await db.execute(
+            select(Message)
+            .where(
+                Message.enrollment_id == enrollment.id,
+                Message.direction == "outbound",
+            )
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        prior = prior_msg_q.scalar_one_or_none()
+        if prior and prior.status != "sent":
+            enrollment.next_step_at = None
+            logger.info(
+                f"Drip gate held enrollment {enrollment.id}: prior step is {prior.status}, "
+                f"not sent. Will retry when prior step sends."
+            )
+            return False
+
         step = steps[current_step_idx]
         channel = step.get("channel", sequence.channel)
 
@@ -200,14 +224,11 @@ class OutreachOrchestrator:
         enrollment.current_step = current_step_idx + 1
         enrollment.last_step_at = datetime.now(timezone.utc)
 
-        # Calculate next step time
-        if current_step_idx + 1 < len(steps):
-            next_step = steps[current_step_idx + 1]
-            delay_days = next_step.get("delay_days", 3)
-            next_time = datetime.now(timezone.utc) + timedelta(days=delay_days)
-            enrollment.next_step_at = next_send_window(next_time)
-        else:
-            enrollment.next_step_at = None
+        # PARK: next_step_at starts NULL. `schedule_next_step_after_send` will
+        # populate it based on the real sent_at + next step's delay_days, so the
+        # drip timer begins from when the email actually went out — not when the
+        # AI drafted it (which could be days before approval).
+        enrollment.next_step_at = None
 
         # Log activity
         activity = Activity(
@@ -305,6 +326,56 @@ class OutreachOrchestrator:
             "ai_suggested_reply": ai_reply,
             "sequences_stopped": True,
         }
+
+    async def schedule_next_step_after_send(
+        self, message: Message, db: AsyncSession
+    ):
+        """Called immediately after a message is successfully sent.
+
+        Looks up the message's enrollment (if any) and schedules the next step
+        based on the REAL sent_at + next step's delay_days. This is how drip
+        actually drips — the timer for step N+1 starts ticking from step N's
+        send time, not from step N's generation time.
+
+        No-ops when: message has no enrollment, enrollment is not active,
+        sequence is complete, or sequence has no more steps.
+        """
+        if not message.enrollment_id or not message.sent_at:
+            return
+
+        enrollment_q = await db.execute(
+            select(CampaignEnrollment).where(
+                CampaignEnrollment.id == message.enrollment_id
+            )
+        )
+        enrollment = enrollment_q.scalar_one_or_none()
+        if not enrollment or enrollment.status != "active":
+            return
+
+        seq_q = await db.execute(
+            select(Sequence).where(Sequence.id == enrollment.sequence_id)
+        )
+        sequence = seq_q.scalar_one_or_none()
+        if not sequence or not sequence.steps:
+            return
+
+        steps = sequence.steps
+        next_idx = enrollment.current_step  # already incremented past the step that just sent
+
+        if next_idx >= len(steps):
+            # Sequence complete — mark enrollment finished so drip stops.
+            enrollment.status = "completed"
+            enrollment.next_step_at = None
+            return
+
+        next_step = steps[next_idx]
+        delay_days = next_step.get("delay_days", 3)
+        next_time = message.sent_at + timedelta(days=delay_days)
+        enrollment.next_step_at = next_send_window(next_time)
+        logger.info(
+            f"Enrollment {enrollment.id} step {next_idx + 1} scheduled for {enrollment.next_step_at} "
+            f"(sent_at={message.sent_at} + {delay_days}d)"
+        )
 
     async def _check_cooldown(
         self, lead_id, channel: str, db: AsyncSession
