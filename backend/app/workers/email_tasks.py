@@ -90,15 +90,17 @@ def send_email(message_id: str):
                 await db.commit()
                 return {"status": "held", "reason": "do_not_contact"}
 
-            # Contact guard check
+            # Contact guard check — bypassed for messages inside an active enrollment
+            # (deliberate sequence timing takes precedence over the opportunistic guard)
             from app.services.contact_guard import can_contact
-            allowed, reason = await can_contact(lead, db)
-            if not allowed:
-                message.status = "content_review"
-                message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
-                await db.commit()
-                logger.info(f"Contact guard blocked {lead.email}: {reason}")
-                return {"status": "held", "reason": f"contact_guard: {reason}"}
+            if not message.enrollment_id:
+                allowed, reason = await can_contact(lead, db)
+                if not allowed:
+                    message.status = "content_review"
+                    message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
+                    await db.commit()
+                    logger.info(f"Contact guard blocked {lead.email}: {reason}")
+                    return {"status": "held", "reason": f"contact_guard: {reason}"}
 
             # Content quality gate — reject generic/placeholder messages
             passes, reason = _content_passes_quality(message.subject, message.body)

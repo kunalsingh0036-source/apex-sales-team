@@ -62,18 +62,20 @@ def send_linkedin_message(message_id: str):
                 await db.commit()
                 return {"status": "held", "reason": "do_not_contact"}
 
-            # Contact guard (shared with email path)
+            # Contact guard — bypassed for messages inside an active enrollment.
+            # Deliberate sequence timing takes precedence over the opportunistic guard.
             from app.services.contact_guard import can_contact, update_last_contacted
-            allowed, reason = await can_contact(lead, db)
-            if not allowed:
-                message.status = "content_review"
-                message.extra_data = {
-                    **(message.extra_data or {}),
-                    "linkedin_status": "pending_approval",
-                    "last_error": f"Contact guard: {reason}",
-                }
-                await db.commit()
-                return {"status": "held", "reason": f"contact_guard: {reason}"}
+            if not message.enrollment_id:
+                allowed, reason = await can_contact(lead, db)
+                if not allowed:
+                    message.status = "content_review"
+                    message.extra_data = {
+                        **(message.extra_data or {}),
+                        "linkedin_status": "pending_approval",
+                        "last_error": f"Contact guard: {reason}",
+                    }
+                    await db.commit()
+                    return {"status": "held", "reason": f"contact_guard: {reason}"}
 
             can_send = await rate_limiter.can_send("linkedin")
             if not can_send:

@@ -314,13 +314,16 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
         await db.commit()
         raise HTTPException(status_code=400, detail="Lead is do_not_contact")
 
-    # Contact guard check
-    from app.services.contact_guard import can_contact
-    allowed, reason = await can_contact(lead, db)
-    if not allowed:
-        message.extra_data = {**(message.extra_data or {}), "last_error": f"Contact guard: {reason}"}
-        await db.commit()
-        raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
+    # Contact guard check. Bypassed when the message is part of an active enrollment
+    # because the sequence's timing is a deliberate coordinated choice — the guard
+    # exists to prevent opportunistic double-touches, not scheduled follow-ups.
+    if not message.enrollment_id:
+        from app.services.contact_guard import can_contact
+        allowed, reason = await can_contact(lead, db)
+        if not allowed:
+            message.extra_data = {**(message.extra_data or {}), "last_error": f"Contact guard: {reason}"}
+            await db.commit()
+            raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
 
     # If schedule_at provided, queue for the relevant worker regardless of channel
     if data and data.schedule_at:
@@ -420,12 +423,14 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             results.append({"id": str(mid), "status": "skipped", "reason": f"channel {channel} not supported"})
             continue
 
-        # Contact guard check
-        from app.services.contact_guard import can_contact
-        allowed, reason = await can_contact(lead, db)
-        if not allowed:
-            results.append({"id": str(mid), "status": "blocked", "reason": f"contact_guard: {reason}"})
-            continue
+        # Contact guard check — bypassed for messages inside an active enrollment
+        # (deliberate sequence timing takes precedence over the opportunistic guard)
+        if not message.enrollment_id:
+            from app.services.contact_guard import can_contact
+            allowed, reason = await can_contact(lead, db)
+            if not allowed:
+                results.append({"id": str(mid), "status": "blocked", "reason": f"contact_guard: {reason}"})
+                continue
 
         # LinkedIn path: queue for worker
         if channel == "linkedin":
