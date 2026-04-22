@@ -11,7 +11,7 @@ from app.models.message import Message
 from app.models.lead import Lead
 from app.models.activity import Activity
 from app.schemas.message import (
-    MessageResponse, SendMessageRequest, GenerateMessageRequest,
+    MessageResponse, MessageLeadSummary, SendMessageRequest, GenerateMessageRequest,
     ApproveBatchRequest, RegenerateRequest,
 )
 from app.schemas.common import PaginatedResponse
@@ -33,7 +33,7 @@ async def list_messages(
     classification: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Message)
+    query = select(Message).options(selectinload(Message.lead))
     count_query = select(func.count()).select_from(Message)
 
     if lead_id:
@@ -58,8 +58,20 @@ async def list_messages(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    def _serialize(m: Message) -> MessageResponse:
+        resp = MessageResponse.model_validate(m)
+        if m.lead is not None:
+            resp.lead = MessageLeadSummary(
+                id=m.lead.id,
+                lead_code=m.lead.lead_code,
+                full_name=m.lead.full_name,
+                email=m.lead.email,
+                job_title=m.lead.job_title,
+            )
+        return resp
+
     return PaginatedResponse(
-        items=[MessageResponse.model_validate(m) for m in items],
+        items=[_serialize(m) for m in items],
         total=total,
         page=page,
         per_page=per_page,

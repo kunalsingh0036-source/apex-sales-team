@@ -83,6 +83,7 @@ class CampaignResponse(BaseModel):
 
 class EnrollmentLeadSummary(BaseModel):
     id: uuid.UUID
+    lead_code: str = ""
     full_name: str
     email: Optional[str] = None
     job_title: str

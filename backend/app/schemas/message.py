@@ -47,6 +47,16 @@ class TemplateResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MessageLeadSummary(BaseModel):
+    id: uuid.UUID
+    lead_code: str
+    full_name: str
+    email: Optional[str] = None
+    job_title: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class MessageResponse(BaseModel):
     id: uuid.UUID
     lead_id: uuid.UUID
@@ -64,6 +74,8 @@ class MessageResponse(BaseModel):
     opened_at: Optional[datetime]
     replied_at: Optional[datetime]
     created_at: datetime
+    extra_data: Optional[dict] = None
+    lead: Optional[MessageLeadSummary] = None
 
     model_config = {"from_attributes": True}
 

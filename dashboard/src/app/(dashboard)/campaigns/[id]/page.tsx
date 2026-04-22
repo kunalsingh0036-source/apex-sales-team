@@ -224,6 +224,7 @@ export default function CampaignDetailPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-rich-creme bg-creme/50">
+                <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">#</th>
                 <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Lead</th>
                 <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Company</th>
                 <th className="text-left px-5 py-3.5 font-label text-xs tracking-wider text-mid-warm uppercase">Score</th>
@@ -236,6 +237,9 @@ export default function CampaignDetailPage() {
             <tbody>
               {enrollments.map((e: any) => (
                 <tr key={e.id} className="border-b border-rich-creme/50 hover:bg-creme/30">
+                  <td className="px-5 py-3.5 font-mono text-xs font-bold text-crimson-dark whitespace-nowrap">
+                    {e.lead?.lead_code || "—"}
+                  </td>
                   <td className="px-5 py-3.5">
                     {e.lead ? (
                       <div>

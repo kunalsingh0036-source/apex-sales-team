@@ -284,6 +284,7 @@ async def list_enrollments(
         if lead:
             resp.lead = EnrollmentLeadSummary(
                 id=lead.id,
+                lead_code=lead.lead_code,
                 full_name=lead.full_name,
                 email=lead.email,
                 job_title=lead.job_title,

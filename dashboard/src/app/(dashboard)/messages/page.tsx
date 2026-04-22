@@ -19,6 +19,13 @@ interface MessageItem {
   ai_suggested_reply: string | null;
   sent_at: string | null;
   created_at: string;
+  lead?: {
+    id: string;
+    lead_code: string;
+    full_name: string;
+    email: string | null;
+    job_title: string | null;
+  } | null;
   extra_data?: {
     last_error?: string | null;
     attachments?: { filename: string; size: number; content_type: string }[];
@@ -58,9 +65,9 @@ export default function MessagesPage() {
   const [loadingReply, setLoadingReply] = useState(false);
   const [showComposeModal, setShowComposeModal] = useState(false);
   const [composing, setComposing] = useState(false);
-  const [composeForm, setComposeForm] = useState({ lead_id: "", lead_name: "", subject: "", body: "", channel: "email" });
+  const [composeForm, setComposeForm] = useState({ lead_id: "", lead_name: "", lead_code: "", subject: "", body: "", channel: "email" });
   const [leadSearch, setLeadSearch] = useState("");
-  const [leadResults, setLeadResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [leadResults, setLeadResults] = useState<{ id: string; name: string; email: string; lead_code: string }[]>([]);
   const [showLeadDropdown, setShowLeadDropdown] = useState(false);
   const [searchingLeads, setSearchingLeads] = useState(false);
   const { toast } = useToast();
@@ -146,7 +153,7 @@ export default function MessagesPage() {
         channel: composeForm.channel,
       });
       setShowComposeModal(false);
-      setComposeForm({ lead_id: "", lead_name: "", subject: "", body: "", channel: "email" });
+      setComposeForm({ lead_id: "", lead_name: "", lead_code: "", subject: "", body: "", channel: "email" });
       setLeadSearch("");
       setLeadResults([]);
       fetchMessages();
@@ -170,8 +177,9 @@ export default function MessagesPage() {
         const data = await api.leads.list({ search: leadSearch });
         const results = (data.items || []).map((l: any) => ({
           id: l.id,
-          name: l.company_name || l.contact_name || l.id,
+          name: l.full_name || l.company_name || l.contact_name || l.id,
           email: l.email || "",
+          lead_code: l.lead_code || "",
         }));
         setLeadResults(results);
         setShowLeadDropdown(results.length > 0);
@@ -433,6 +441,11 @@ export default function MessagesPage() {
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2 flex-wrap">
+                  {msg.lead?.lead_code && (
+                    <span className="font-mono text-xs font-bold text-crimson-dark bg-creme px-2 py-0.5 rounded">
+                      {msg.lead.lead_code}
+                    </span>
+                  )}
                   <Badge variant={msg.direction === "inbound" ? "info" : "default"}>
                     {msg.direction === "inbound" ? "IN" : "OUT"}
                   </Badge>
@@ -474,7 +487,21 @@ export default function MessagesPage() {
               <p className="text-sm text-mid-warm line-clamp-2">{msg.body}</p>
 
               <div className="text-xs text-mid-warm mt-2">
-                Lead: {msg.lead_id.substring(0, 8)}...
+                {msg.lead ? (
+                  <>
+                    <span className="font-mono font-bold text-crimson-dark">{msg.lead.lead_code}</span>
+                    <span className="mx-1">·</span>
+                    <span className="font-semibold text-warm-charcoal">{msg.lead.full_name}</span>
+                    {msg.lead.job_title && (
+                      <>
+                        <span className="mx-1">·</span>
+                        <span>{msg.lead.job_title}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>Lead: {msg.lead_id.substring(0, 8)}...</>
+                )}
               </div>
             </div>
           ))}
@@ -490,11 +517,18 @@ export default function MessagesPage() {
               <div className="relative">
                 {composeForm.lead_id ? (
                   <div className="flex items-center gap-2 w-full rounded border px-3 py-2 text-sm bg-creme/30">
-                    <span className="font-bold text-warm-charcoal">{composeForm.lead_name}</span>
+                    {composeForm.lead_code && (
+                      <span className="font-mono text-xs font-bold text-crimson-dark bg-creme px-2 py-0.5 rounded">
+                        {composeForm.lead_code}
+                      </span>
+                    )}
+                    <span className="font-bold text-warm-charcoal">
+                      {composeForm.lead_name}
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
-                        setComposeForm({ ...composeForm, lead_id: "", lead_name: "" });
+                        setComposeForm({ ...composeForm, lead_id: "", lead_name: "", lead_code: "" });
                         setLeadSearch("");
                       }}
                       className="ml-auto text-mid-warm hover:text-crimson text-xs"
@@ -518,15 +552,18 @@ export default function MessagesPage() {
                       <button
                         key={lead.id}
                         type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-creme/50 transition-colors"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-creme/50 transition-colors flex items-center gap-2"
                         onClick={() => {
-                          setComposeForm({ ...composeForm, lead_id: lead.id, lead_name: lead.name });
+                          setComposeForm({ ...composeForm, lead_id: lead.id, lead_name: lead.name, lead_code: lead.lead_code });
                           setShowLeadDropdown(false);
                           setLeadSearch("");
                         }}
                       >
+                        {lead.lead_code && (
+                          <span className="font-mono text-xs font-bold text-crimson-dark shrink-0">{lead.lead_code}</span>
+                        )}
                         <span className="font-bold text-warm-charcoal">{lead.name}</span>
-                        {lead.email && <span className="text-mid-warm ml-2">{lead.email}</span>}
+                        {lead.email && <span className="text-mid-warm text-xs ml-auto truncate">{lead.email}</span>}
                       </button>
                     ))}
                   </div>
@@ -636,6 +673,11 @@ export default function MessagesPage() {
                   <div className="mb-4">
                     <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">To</p>
                     <p className="text-sm text-warm-charcoal">
+                      {(selectedLead.lead_code || selectedMessage.lead?.lead_code) && (
+                        <span className="font-mono text-xs font-bold text-crimson-dark bg-creme px-2 py-0.5 rounded mr-2">
+                          {selectedLead.lead_code || selectedMessage.lead?.lead_code}
+                        </span>
+                      )}
                       <span className="font-bold">{selectedLead.first_name} {selectedLead.last_name}</span>
                       {selectedLead.email ? (
                         <span className="text-mid-warm font-mono ml-2">&lt;{selectedLead.email}&gt;</span>
@@ -711,8 +753,13 @@ export default function MessagesPage() {
             </div>
 
             <div className="mb-4">
-              <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Lead ID</p>
-              <p className="text-sm font-mono text-warm-charcoal break-all">{selectedMessage.lead_id}</p>
+              <p className="font-label text-xs tracking-wider text-mid-warm uppercase mb-1">Lead</p>
+              {(selectedLead?.lead_code || selectedMessage.lead?.lead_code) && (
+                <p className="text-sm font-mono font-bold text-crimson-dark">
+                  {selectedLead?.lead_code || selectedMessage.lead?.lead_code}
+                </p>
+              )}
+              <p className="text-xs font-mono text-mid-warm mt-1 break-all">{selectedMessage.lead_id}</p>
               {selectedLead?.email && (
                 <p className="text-xs font-mono text-mid-warm mt-1 break-all">{selectedLead.email}</p>
               )}
