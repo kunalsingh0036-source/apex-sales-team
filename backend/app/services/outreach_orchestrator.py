@@ -46,7 +46,7 @@ class OutreachOrchestrator:
         step = steps[current_step_idx]
         channel = step.get("channel", sequence.channel)
 
-        # Check rate limit
+        # Check rate limit (per channel)
         can_send = await rate_limiter.can_send(channel)
         if not can_send:
             return False
@@ -67,11 +67,10 @@ class OutreachOrchestrator:
             logger.info(f"Contact guard blocked {lead.email}: {reason}")
             return False
 
-        # Check cross-channel cooldown
-        if channel != "email":
-            cooldown_ok = await self._check_cooldown(lead.id, channel, db)
-            if not cooldown_ok:
-                return False
+        # NOTE: No cross-channel cooldown check here — deliberate sequence steps
+        # have their own `delay_days` timing, which is the source of truth.
+        # The cooldown rule (CROSS_CHANNEL_RULES) exists to prevent opportunistic
+        # multi-channel spam, not to block coordinated follow-ups.
 
         # Load company info
         company_name = ""
@@ -87,11 +86,57 @@ class OutreachOrchestrator:
                 industry = company.industry or "Other"
 
         # Always generate fresh, personalized content per lead.
-        # Sequences only define timing and step type — never reuse template text.
         variant = "A" if hash(str(enrollment.id)) % 2 == 0 else "B"
         message_type = step.get("type", "cold_intro")
         subject = None
         body = ""
+
+        # Pre-compute metadata for this message
+        extra_data: dict = {}
+        message_status = "content_review"
+        last_error: str | None = None
+
+        # LinkedIn-specific path: needs linkedin_url on the lead
+        if channel == "linkedin":
+            extra_data["linkedin_type"] = "connection_request"
+            extra_data["linkedin_status"] = "pending_approval"
+            if lead.linkedin_url:
+                extra_data["profile_url"] = lead.linkedin_url
+            else:
+                # Hold for human review — don't block future email steps
+                extra_data["needs_linkedin_url"] = True
+                last_error = "Lead has no linkedin_url on record"
+
+        # Build AI context (for linkedin follow-up, reference the last sent email)
+        prior_email_context = ""
+        if channel == "linkedin":
+            prior_email_q = await db.execute(
+                select(Message)
+                .where(
+                    Message.lead_id == lead.id,
+                    Message.channel == "email",
+                    Message.direction == "outbound",
+                    Message.status == "sent",
+                )
+                .order_by(Message.sent_at.desc())
+                .limit(1)
+            )
+            prior_email = prior_email_q.scalar_one_or_none()
+            if prior_email:
+                prior_email_context = (
+                    f"You sent this person this email yesterday:\n"
+                    f"Subject: {prior_email.subject or '(no subject)'}\n"
+                    f"Body: {(prior_email.body or '')[:500]}"
+                )
+
+        custom_instructions = ""
+        if channel == "linkedin":
+            custom_instructions = (
+                "Hard limit: 300 characters including signature. "
+                "Reference the email you sent yesterday naturally. "
+                "Warm, human, conversational. Sign with 'Radhika' only — "
+                "no company, no phone (those are visible on the LinkedIn profile)."
+            )
 
         try:
             ai_result = await ai_engine.generate_outreach_message(
@@ -101,9 +146,34 @@ class OutreachOrchestrator:
                 lead_industry=industry,
                 channel=channel,
                 message_type=message_type,
+                context=prior_email_context,
+                custom_instructions=custom_instructions,
             )
-            body = ai_result.get("body", "")
+            body = ai_result.get("body", "") or ""
             subject = ai_result.get("subject") or subject
+
+            # Enforce 300-char limit for LinkedIn connection requests
+            if channel == "linkedin" and message_type == "connection_request" and len(body) > 300:
+                # Regenerate once with stricter prompt
+                try:
+                    retry = await ai_engine.generate_outreach_message(
+                        lead_name=lead.full_name,
+                        lead_title=lead.job_title,
+                        lead_company=company_name,
+                        lead_industry=industry,
+                        channel=channel,
+                        message_type=message_type,
+                        context=prior_email_context,
+                        custom_instructions=custom_instructions + " You went over 300 chars on the first try — be much tighter this time. Count characters.",
+                    )
+                    retry_body = retry.get("body", "") or ""
+                    if retry_body and len(retry_body) <= 300:
+                        body = retry_body
+                except Exception:
+                    pass
+                # Last resort: truncate with ellipsis
+                if len(body) > 300:
+                    body = body[:297].rstrip() + "..."
         except Exception as e:
             logger.error(f"AI generation failed for {lead.email}: {e}")
             return False  # don't send generic content
@@ -117,10 +187,13 @@ class OutreachOrchestrator:
             direction="outbound",
             subject=subject,
             body=body,
-            status="content_review",
+            status=message_status,
             variant=variant,
             scheduled_at=enrollment.next_step_at or datetime.now(timezone.utc),
+            extra_data=extra_data,
         )
+        if last_error:
+            message.extra_data = {**message.extra_data, "last_error": last_error}
         db.add(message)
 
         # Update enrollment

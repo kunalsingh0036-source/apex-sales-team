@@ -237,47 +237,72 @@ class AutomationEngine:
 
     # ─── Stage 3: Ensure Sequences ────────────────────────────
 
-    async def ensure_sequences(self, db: AsyncSession) -> dict:
-        """Ensure one universal sequence per channel exists.
-        Sequences only define timing and step types. Actual message
-        content is generated fresh per lead by the AI engine."""
-        channels = ["email"]  # LinkedIn cold DMs not supported
-        checked = 0
-        created = 0
+    UNIVERSAL_SEQUENCE_NAME = "Autopilot: Universal (multi-channel)"
 
-        for channel in channels:
-            checked += 1
-            existing = await db.execute(
-                select(Sequence).where(
-                    and_(
-                        Sequence.target_industry == "all",
-                        Sequence.channel == channel,
-                        Sequence.is_active == True,
-                    )
+    @staticmethod
+    def _universal_steps() -> list[dict]:
+        """Single multi-channel sequence: email → linkedin follow-up → more emails.
+
+        LinkedIn step is a 1-day follow-up after the cold intro email, deliberately
+        warm and brief (300-char connection request note referencing the email).
+        """
+        return [
+            {"channel": "email",    "type": "cold_intro",         "delay_days": 0},
+            {"channel": "linkedin", "type": "connection_request", "delay_days": 1},
+            {"channel": "email",    "type": "follow_up_1",        "delay_days": 3},
+            {"channel": "email",    "type": "follow_up_2",        "delay_days": 5},
+            {"channel": "email",    "type": "breakup",            "delay_days": 7},
+        ]
+
+    async def _get_or_create_universal_sequence(self, db: AsyncSession) -> Sequence:
+        """Return the active multi-channel universal sequence, creating it if missing."""
+        existing = await db.execute(
+            select(Sequence).where(
+                and_(
+                    Sequence.name == self.UNIVERSAL_SEQUENCE_NAME,
+                    Sequence.is_active == True,
                 )
             )
-            if existing.scalar_one_or_none():
-                continue
+        )
+        sequence = existing.scalar_one_or_none()
+        if sequence:
+            return sequence
 
-            # Universal 4-step sequence — timing only, no template content
-            steps = [
-                {"channel": channel, "type": "cold_intro", "delay_days": 0},
-                {"channel": channel, "type": "follow_up_1", "delay_days": 3},
-                {"channel": channel, "type": "follow_up_2", "delay_days": 5},
-                {"channel": channel, "type": "breakup", "delay_days": 7},
-            ]
+        sequence = Sequence(
+            name=self.UNIVERSAL_SEQUENCE_NAME,
+            description="Universal multi-channel sequence: email cold intro, LinkedIn follow-up 1 day later, then email follow-ups and breakup. Content is AI-generated fresh per lead.",
+            target_industry="all",
+            channel="email",  # primary channel; individual steps have their own
+            is_active=True,
+            steps=self._universal_steps(),
+            settings={
+                "source": "autopilot",
+                "multi_channel": True,
+                "generated_at": datetime.now(IST).isoformat(),
+            },
+        )
+        db.add(sequence)
+        await db.flush()
+        return sequence
 
-            sequence = Sequence(
-                name=f"Autopilot: Universal ({channel})",
-                description=f"Universal {channel} sequence. Content is AI-generated fresh per lead.",
-                target_industry="all",
-                channel=channel,
-                is_active=True,
-                steps=steps,
-                settings={"source": "autopilot", "generated_at": datetime.now(IST).isoformat()},
+    async def ensure_sequences(self, db: AsyncSession) -> dict:
+        """Ensure the single universal multi-channel sequence exists.
+        Sequences only define timing and step types (email/linkedin per step).
+        Actual message content is generated fresh per lead by the AI engine."""
+        checked = 1
+        created = 0
+
+        existing = await db.execute(
+            select(Sequence).where(
+                and_(
+                    Sequence.name == self.UNIVERSAL_SEQUENCE_NAME,
+                    Sequence.is_active == True,
+                )
             )
-            db.add(sequence)
-            created += 1
+        )
+        if not existing.scalar_one_or_none():
+            await self._get_or_create_universal_sequence(db)
+            created = 1
 
         await db.commit()
         result = {"checked": checked, "created": created}
@@ -349,84 +374,50 @@ class AutomationEngine:
         today = date.today().isoformat()
         debug_info = {"eligible_leads": len(leads), "groups": {t: len(g) for t, g in groups.items()}}
 
+        # Use the single universal multi-channel sequence (email + linkedin steps)
+        sequence = await self._get_or_create_universal_sequence(db)
+
         for tier, group_leads in groups.items():
-            channels, delay_mult = TIER_STRATEGY[tier]
+            _channels, delay_mult = TIER_STRATEGY[tier]
 
-            for channel in channels:
-                # Skip LinkedIn — API doesn't support cold DMs to non-connections
-                if channel == "linkedin":
-                    continue
+            # Rate limit is capped by email daily limit since step 0 is email
+            remaining = await rate_limiter.remaining("email")
+            max_enroll = min(len(group_leads), remaining)
+            if max_enroll <= 0:
+                continue
 
-                # Find the universal sequence for this channel
-                seq_result = await db.execute(
-                    select(Sequence).where(
-                        and_(
-                            Sequence.target_industry == "all",
-                            Sequence.channel == channel,
-                            Sequence.is_active == True,
-                        )
-                    )
-                )
-                sequence = seq_result.scalar_one_or_none()
-                if not sequence:
-                    # Auto-create the universal sequence
-                    sequence = Sequence(
-                        name=f"Autopilot: Universal ({channel})",
-                        description=f"Universal {channel} sequence. Content is AI-generated fresh per lead.",
-                        target_industry="all",
-                        channel=channel,
-                        is_active=True,
-                        steps=[
-                            {"channel": channel, "type": "cold_intro", "delay_days": 0},
-                            {"channel": channel, "type": "follow_up_1", "delay_days": 3},
-                            {"channel": channel, "type": "follow_up_2", "delay_days": 5},
-                            {"channel": channel, "type": "breakup", "delay_days": 7},
-                        ],
-                        settings={"source": "autopilot"},
-                    )
-                    db.add(sequence)
-                    await db.flush()  # get sequence.id
+            campaign = Campaign(
+                name=f"Autopilot: {tier} leads ({today})",
+                sequence_id=sequence.id,
+                status="active",
+                target_filter={
+                    "tier": tier,
+                    "source": "autopilot",
+                },
+                total_leads=max_enroll,
+                started_at=datetime.now(IST),
+            )
+            db.add(campaign)
+            await db.flush()
 
-                # Check rate limits before creating
-                remaining = await rate_limiter.remaining(channel)
-                max_enroll = min(len(group_leads), remaining)
-                if max_enroll <= 0:
-                    continue
+            now = datetime.now(IST)
+            for lead in group_leads[:max_enroll]:
+                first_step = sequence.steps[0] if sequence.steps else {}
+                base_delay = first_step.get("delay_days", 0)
+                next_step_at = now + timedelta(days=base_delay * delay_mult)
 
-                campaign = Campaign(
-                    name=f"Autopilot: {tier} leads ({today})",
+                enrollment = CampaignEnrollment(
+                    campaign_id=campaign.id,
+                    lead_id=lead.id,
                     sequence_id=sequence.id,
+                    current_step=0,
                     status="active",
-                    target_filter={
-                        "tier": tier,
-                        "source": "autopilot",
-                        "channel": channel,
-                    },
-                    total_leads=max_enroll,
-                    started_at=datetime.now(IST),
+                    next_step_at=next_step_at,
                 )
-                db.add(campaign)
-                await db.flush()
+                db.add(enrollment)
+                leads_enrolled += 1
 
-                now = datetime.now(IST)
-                for lead in group_leads[:max_enroll]:
-                    # Calculate first step time with delay multiplier
-                    first_step = sequence.steps[0] if sequence.steps else {}
-                    base_delay = first_step.get("delay_days", 0)
-                    next_step_at = now + timedelta(days=base_delay * delay_mult)
-
-                    enrollment = CampaignEnrollment(
-                        campaign_id=campaign.id,
-                        lead_id=lead.id,
-                        sequence_id=sequence.id,
-                        current_step=0,
-                        status="active",
-                        next_step_at=next_step_at,
-                    )
-                    db.add(enrollment)
-                    leads_enrolled += 1
-
-                campaigns_created += 1
+            campaigns_created += 1
 
         await db.commit()
         result = {"campaigns_created": campaigns_created, "leads_enrolled": leads_enrolled, "debug": debug_info}

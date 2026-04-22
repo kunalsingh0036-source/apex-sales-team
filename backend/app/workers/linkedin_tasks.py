@@ -41,14 +41,39 @@ def send_linkedin_message(message_id: str):
             )
             lead = lead_result.scalar_one_or_none()
             if not lead or not lead.linkedin_url:
-                message.status = "failed"
+                # Hold for human review — don't silently fail
+                message.status = "content_review"
+                message.extra_data = {
+                    **(message.extra_data or {}),
+                    "linkedin_status": "pending_approval",
+                    "needs_linkedin_url": True,
+                    "last_error": "Lead has no linkedin_url on record",
+                }
                 await db.commit()
-                return {"status": "failed", "reason": "no linkedin_url"}
+                return {"status": "held", "reason": "no linkedin_url"}
 
             if lead.do_not_contact:
-                message.status = "failed"
+                message.status = "content_review"
+                message.extra_data = {
+                    **(message.extra_data or {}),
+                    "linkedin_status": "pending_approval",
+                    "last_error": "Lead is marked do_not_contact",
+                }
                 await db.commit()
-                return {"status": "failed", "reason": "do_not_contact"}
+                return {"status": "held", "reason": "do_not_contact"}
+
+            # Contact guard (shared with email path)
+            from app.services.contact_guard import can_contact, update_last_contacted
+            allowed, reason = await can_contact(lead, db)
+            if not allowed:
+                message.status = "content_review"
+                message.extra_data = {
+                    **(message.extra_data or {}),
+                    "linkedin_status": "pending_approval",
+                    "last_error": f"Contact guard: {reason}",
+                }
+                await db.commit()
+                return {"status": "held", "reason": f"contact_guard: {reason}"}
 
             can_send = await rate_limiter.can_send("linkedin")
             if not can_send:
@@ -57,53 +82,74 @@ def send_linkedin_message(message_id: str):
             try:
                 # Determine message type from metadata
                 msg_type = (message.extra_data or {}).get("linkedin_type", "connection_request")
-                profile_urn = (message.extra_data or {}).get("profile_urn", "")
+                profile_urn = (message.extra_data or {}).get("profile_urn", "") or (message.extra_data or {}).get("profile_url", "")
 
                 if not profile_urn:
-                    # Extract from linkedin_url
                     profile_urn = lead.linkedin_url
 
                 if msg_type == "connection_request":
                     result = await linkedin_service.send_connection_request(
                         profile_urn=profile_urn,
-                        note=message.body[:300],
+                        note=(message.body or "")[:300],
                     )
                 elif msg_type == "inmail":
                     result = await linkedin_service.send_inmail(
                         recipient_urn=profile_urn,
                         subject=message.subject or "The Apex Human Company",
-                        body=message.body,
+                        body=message.body or "",
                     )
                 else:
                     result = await linkedin_service.send_message(
                         recipient_urn=profile_urn,
-                        body=message.body,
+                        body=message.body or "",
                         subject=message.subject,
                     )
 
                 if result.get("status") == "sent":
                     message.status = "sent"
                     message.sent_at = datetime.now(timezone.utc)
+                    external = result.get("invitation_id") or result.get("message_id") or result.get("id")
+                    if external:
+                        message.external_id = str(external)
+                    message.extra_data = {
+                        **(message.extra_data or {}),
+                        "linkedin_status": "sent",
+                        "last_error": None,
+                    }
                     await rate_limiter.record_send("linkedin")
+                    await update_last_contacted(lead, db)
 
                     activity = Activity(
                         lead_id=lead.id,
                         type=f"linkedin_{msg_type}_sent",
                         channel="linkedin",
-                        description=f"LinkedIn {msg_type}: {message.body[:60]}",
+                        description=f"LinkedIn {msg_type}: {(message.body or '')[:60]}",
                     )
                     db.add(activity)
                     await db.commit()
                     return {"status": "sent", "type": msg_type}
                 else:
-                    message.status = "failed"
+                    # Hold for retry instead of marking failed
+                    err = result.get("error") or "LinkedIn API returned non-sent status"
+                    message.status = "content_review"
+                    message.extra_data = {
+                        **(message.extra_data or {}),
+                        "linkedin_status": "pending_approval",
+                        "last_error": f"LinkedIn send failed: {err}",
+                    }
                     await db.commit()
-                    return {"status": "failed", "error": result.get("error")}
+                    return {"status": "held", "error": err}
 
             except Exception as e:
-                message.status = "failed"
+                # Hold for retry instead of marking failed
+                message.status = "content_review"
+                message.extra_data = {
+                    **(message.extra_data or {}),
+                    "linkedin_status": "pending_approval",
+                    "last_error": f"LinkedIn send exception: {str(e)}",
+                }
                 await db.commit()
-                return {"status": "failed", "error": str(e)}
+                return {"status": "held", "error": str(e)}
 
     return run_async(_send())
 

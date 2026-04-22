@@ -238,6 +238,138 @@ async def get_lead_timeline(
     ]
 
 
+@router.get("/{lead_id}/profile")
+async def get_lead_profile(
+    lead_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Unified lead profile: lead + active enrollments + all messages + all activities.
+    Used by the lead detail page to render the full outreach story in one fetch."""
+    from app.models.message import Message
+    from app.models.sequence import Sequence, Campaign, CampaignEnrollment
+
+    # Lead (with company)
+    lead_result = await db.execute(
+        select(Lead).options(selectinload(Lead.company)).where(Lead.id == lead_id)
+    )
+    lead = lead_result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    # Enrollments with campaign + sequence (active first, then others)
+    enr_result = await db.execute(
+        select(CampaignEnrollment, Campaign, Sequence)
+        .join(Campaign, CampaignEnrollment.campaign_id == Campaign.id)
+        .join(Sequence, CampaignEnrollment.sequence_id == Sequence.id)
+        .where(CampaignEnrollment.lead_id == lead_id)
+        .order_by(CampaignEnrollment.enrolled_at.desc())
+    )
+    enrollments_out = []
+    for enr, camp, seq in enr_result.all():
+        steps = seq.steps or []
+        total_steps = len(steps)
+        current_idx = enr.current_step or 0
+        next_step = steps[current_idx] if current_idx < total_steps else None
+        enrollments_out.append({
+            "id": str(enr.id),
+            "campaign_id": str(camp.id),
+            "campaign_name": camp.name,
+            "sequence_id": str(seq.id),
+            "sequence_name": seq.name,
+            "status": enr.status,
+            "current_step": current_idx,
+            "total_steps": total_steps,
+            "next_step_at": enr.next_step_at.isoformat() if enr.next_step_at else None,
+            "next_step_channel": next_step.get("channel") if next_step else None,
+            "next_step_type": next_step.get("type") if next_step else None,
+            "last_step_at": enr.last_step_at.isoformat() if enr.last_step_at else None,
+            "enrolled_at": enr.enrolled_at.isoformat() if enr.enrolled_at else None,
+        })
+
+    # All messages for this lead (most recent first)
+    msg_result = await db.execute(
+        select(Message)
+        .where(Message.lead_id == lead_id)
+        .order_by(Message.created_at.desc())
+    )
+    messages_out = []
+    for m in msg_result.scalars().all():
+        messages_out.append({
+            "id": str(m.id),
+            "channel": m.channel,
+            "direction": m.direction,
+            "subject": m.subject,
+            "body": m.body,
+            "status": m.status,
+            "classification": m.classification,
+            "external_id": m.external_id,
+            "extra_data": m.extra_data or {},
+            "scheduled_at": m.scheduled_at.isoformat() if m.scheduled_at else None,
+            "sent_at": m.sent_at.isoformat() if m.sent_at else None,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        })
+
+    # Non-message activities (stage changes, enrollment events, etc.)
+    act_result = await db.execute(
+        select(Activity)
+        .where(Activity.lead_id == lead_id)
+        .order_by(Activity.created_at.desc())
+        .limit(200)
+    )
+    activities_out = []
+    for a in act_result.scalars().all():
+        activities_out.append({
+            "id": str(a.id),
+            "type": a.type,
+            "channel": a.channel,
+            "description": a.description,
+            "metadata": a.extra_data,
+            "created_at": a.created_at.isoformat(),
+        })
+
+    # Lead response
+    company = None
+    if lead.company:
+        company = {
+            "id": str(lead.company.id),
+            "name": lead.company.name,
+            "domain": lead.company.domain,
+            "industry": lead.company.industry,
+            "employee_count": lead.company.employee_count,
+        }
+
+    return {
+        "lead": {
+            "id": str(lead.id),
+            "first_name": lead.first_name,
+            "last_name": lead.last_name,
+            "full_name": lead.full_name,
+            "email": lead.email,
+            "phone": lead.phone,
+            "whatsapp_number": lead.whatsapp_number,
+            "linkedin_url": lead.linkedin_url,
+            "job_title": lead.job_title,
+            "department": lead.department,
+            "seniority": lead.seniority,
+            "city": lead.city,
+            "state": lead.state,
+            "country": lead.country,
+            "source": lead.source,
+            "lead_score": lead.lead_score,
+            "stage": lead.stage,
+            "tags": lead.tags,
+            "notes": lead.notes,
+            "consent_status": lead.consent_status,
+            "do_not_contact": lead.do_not_contact,
+            "last_contacted_at": lead.last_contacted_at.isoformat() if lead.last_contacted_at else None,
+            "company": company,
+        },
+        "enrollments": enrollments_out,
+        "messages": messages_out,
+        "activities": activities_out,
+    }
+
+
 @router.post("/bulk-import")
 async def bulk_import_leads(
     file: UploadFile = File(...),

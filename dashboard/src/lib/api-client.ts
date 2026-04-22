@@ -60,6 +60,7 @@ export const api = {
         body: JSON.stringify({ stage }),
       }),
     timeline: (id: string) => request<any[]>(`/leads/${id}/timeline`),
+    profile: (id: string) => request<any>(`/leads/${id}/profile`),
     bulkImport: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
@@ -230,6 +231,11 @@ export const api = {
     },
     removeAttachment: (id: string, filename: string) =>
       request<any>(`/messages/${id}/attachments/${encodeURIComponent(filename)}`, { method: "DELETE" }),
+    markLinkedinStatus: (id: string, status: "accepted" | "declined") =>
+      request<any>(`/messages/${id}/linkedin-status`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      }),
   },
 
   // Discovery & Enrichment

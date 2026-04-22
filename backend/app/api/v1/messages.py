@@ -272,7 +272,11 @@ class ApproveRequest(BaseModel):
 
 @router.post("/{message_id}/approve")
 async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] = None, db: AsyncSession = Depends(get_db)):
-    """Approve a message. If schedule_at is provided, queue for later. Otherwise send now."""
+    """Approve a message. Channel-aware:
+    - Email: sends via Gmail immediately (or schedules).
+    - LinkedIn: queues for the LinkedIn worker (process_linkedin_queue picks up every 15 min).
+    If schedule_at is provided, the message is queued with that scheduled time regardless of channel.
+    """
     result = await db.execute(select(Message).where(Message.id == message_id))
     message = result.scalar_one_or_none()
     if not message:
@@ -282,12 +286,31 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
 
     lead_result = await db.execute(select(Lead).where(Lead.id == message.lead_id))
     lead = lead_result.scalar_one_or_none()
-    if not lead or not lead.email:
-        message.extra_data = {**message.extra_data, "last_error": "Lead has no email"}
-        await db.commit()
-        raise HTTPException(status_code=400, detail="Lead has no email")
+    if not lead:
+        raise HTTPException(status_code=400, detail="Lead not found")
+
+    channel = message.channel or "email"
+
+    # Channel-specific recipient validation
+    if channel == "email":
+        if not lead.email:
+            message.extra_data = {**(message.extra_data or {}), "last_error": "Lead has no email"}
+            await db.commit()
+            raise HTTPException(status_code=400, detail="Lead has no email")
+    elif channel == "linkedin":
+        if not lead.linkedin_url:
+            message.extra_data = {
+                **(message.extra_data or {}),
+                "last_error": "Lead has no linkedin_url on record",
+                "needs_linkedin_url": True,
+            }
+            await db.commit()
+            raise HTTPException(status_code=409, detail="Lead has no linkedin_url — update the lead record before approving")
+    else:
+        raise HTTPException(status_code=400, detail=f"Approval for channel={channel} is not yet supported")
+
     if lead.do_not_contact:
-        message.extra_data = {**message.extra_data, "last_error": "Lead is marked do_not_contact"}
+        message.extra_data = {**(message.extra_data or {}), "last_error": "Lead is marked do_not_contact"}
         await db.commit()
         raise HTTPException(status_code=400, detail="Lead is do_not_contact")
 
@@ -295,28 +318,45 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
     from app.services.contact_guard import can_contact
     allowed, reason = await can_contact(lead, db)
     if not allowed:
-        message.extra_data = {**message.extra_data, "last_error": f"Contact guard: {reason}"}
+        message.extra_data = {**(message.extra_data or {}), "last_error": f"Contact guard: {reason}"}
         await db.commit()
         raise HTTPException(status_code=409, detail=f"Contact guard: {reason}")
 
-    # If schedule_at provided, queue for later instead of sending now
+    # If schedule_at provided, queue for the relevant worker regardless of channel
     if data and data.schedule_at:
         message.status = "queued"
         message.scheduled_at = data.schedule_at
-        message.extra_data = {**message.extra_data, "last_error": None, "approved_by": "human"}
+        extra = {**(message.extra_data or {}), "last_error": None, "approved_by": "human"}
+        if channel == "linkedin":
+            extra["linkedin_status"] = "queued"
+        message.extra_data = extra
         await db.commit()
-        return {"status": "scheduled", "scheduled_at": data.schedule_at.isoformat()}
+        return {"status": "scheduled", "scheduled_at": data.schedule_at.isoformat(), "channel": channel}
 
+    # LinkedIn: queue for the LinkedIn worker (never send inline from the API process)
+    if channel == "linkedin":
+        message.status = "queued"
+        message.scheduled_at = datetime.now(timezone.utc)
+        message.extra_data = {
+            **(message.extra_data or {}),
+            "last_error": None,
+            "approved_by": "human",
+            "linkedin_status": "queued",
+        }
+        await db.commit()
+        return {"status": "queued_for_linkedin", "channel": "linkedin"}
+
+    # Email: send now
     can_send = await rate_limiter.can_send("email")
     if not can_send:
-        message.extra_data = {**message.extra_data, "last_error": "Email daily limit reached"}
+        message.extra_data = {**(message.extra_data or {}), "last_error": "Email daily limit reached"}
         await db.commit()
         raise HTTPException(status_code=429, detail="Email daily limit reached")
 
     try:
         # Build attachments from stored data
         import base64 as b64
-        stored_atts = message.extra_data.get("attachments", [])
+        stored_atts = (message.extra_data or {}).get("attachments", [])
         atts = [{"filename": a["filename"], "content": b64.b64decode(a["data"]), "content_type": a["content_type"]} for a in stored_atts] if stored_atts else None
 
         gmail_result = await gmail_service.send_email(
@@ -328,7 +368,7 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
         message.status = "sent"
         message.sent_at = datetime.now(timezone.utc)
         message.external_id = gmail_result.get("message_id")
-        message.extra_data = {**message.extra_data, "last_error": None}
+        message.extra_data = {**(message.extra_data or {}), "last_error": None}
         await rate_limiter.record_send("email")
 
         # Update last_contacted_at
@@ -343,17 +383,17 @@ async def approve_message(message_id: uuid.UUID, data: Optional[ApproveRequest] 
         )
         db.add(activity)
         await db.commit()
-        return {"status": "sent", "gmail_id": gmail_result.get("message_id")}
+        return {"status": "sent", "gmail_id": gmail_result.get("message_id"), "channel": "email"}
     except Exception as e:
         # Keep in content_review so user can retry — don't mark as failed
-        message.extra_data = {**message.extra_data, "last_error": f"Send failed: {str(e)}"}
+        message.extra_data = {**(message.extra_data or {}), "last_error": f"Send failed: {str(e)}"}
         await db.commit()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/approve-batch")
 async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(get_db)):
-    """Approve and send multiple content_review messages."""
+    """Approve multiple content_review messages. Email sends immediately; LinkedIn queues for the worker."""
     results = []
     for mid in data.message_ids:
         result = await db.execute(select(Message).where(Message.id == mid))
@@ -364,8 +404,20 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
 
         lead_result = await db.execute(select(Lead).where(Lead.id == message.lead_id))
         lead = lead_result.scalar_one_or_none()
-        if not lead or not lead.email:
+        if not lead:
+            results.append({"id": str(mid), "status": "skipped", "reason": "lead not found"})
+            continue
+
+        channel = message.channel or "email"
+
+        if channel == "email" and not lead.email:
             results.append({"id": str(mid), "status": "skipped", "reason": "no email"})
+            continue
+        if channel == "linkedin" and not lead.linkedin_url:
+            results.append({"id": str(mid), "status": "skipped", "reason": "no linkedin_url"})
+            continue
+        if channel not in ("email", "linkedin"):
+            results.append({"id": str(mid), "status": "skipped", "reason": f"channel {channel} not supported"})
             continue
 
         # Contact guard check
@@ -375,6 +427,20 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             results.append({"id": str(mid), "status": "blocked", "reason": f"contact_guard: {reason}"})
             continue
 
+        # LinkedIn path: queue for worker
+        if channel == "linkedin":
+            message.status = "queued"
+            message.scheduled_at = datetime.now(timezone.utc)
+            message.extra_data = {
+                **(message.extra_data or {}),
+                "approved_by": "human",
+                "last_error": None,
+                "linkedin_status": "queued",
+            }
+            results.append({"id": str(mid), "status": "queued_for_linkedin"})
+            continue
+
+        # Email path: send now
         can_send = await rate_limiter.can_send("email")
         if not can_send:
             results.append({"id": str(mid), "status": "rate_limited"})
@@ -383,7 +449,7 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
         try:
             # Load user-uploaded attachments from extra_data (brief is auto-added by email_service)
             import base64 as b64
-            stored_atts = message.extra_data.get("attachments", [])
+            stored_atts = (message.extra_data or {}).get("attachments", [])
             atts = [{"filename": a["filename"], "content": b64.b64decode(a["data"]), "content_type": a["content_type"]} for a in stored_atts] if stored_atts else None
 
             gmail_result = await gmail_service.send_email(
@@ -411,12 +477,49 @@ async def approve_batch(data: ApproveBatchRequest, db: AsyncSession = Depends(ge
             results.append({"id": str(mid), "status": "sent"})
         except Exception as e:
             # Keep in content_review so user can retry
-            message.extra_data = {**message.extra_data, "last_error": f"Send failed: {str(e)}"}
+            message.extra_data = {**(message.extra_data or {}), "last_error": f"Send failed: {str(e)}"}
             results.append({"id": str(mid), "status": "error", "reason": str(e)})
 
     await db.commit()
     sent_count = sum(1 for r in results if r["status"] == "sent")
-    return {"results": results, "sent": sent_count, "total": len(data.message_ids)}
+    queued_count = sum(1 for r in results if r["status"] == "queued_for_linkedin")
+    return {"results": results, "sent": sent_count, "queued_for_linkedin": queued_count, "total": len(data.message_ids)}
+
+
+class LinkedinStatusRequest(BaseModel):
+    status: str  # "accepted" | "declined"
+
+
+@router.post("/{message_id}/linkedin-status")
+async def mark_linkedin_status(
+    message_id: uuid.UUID,
+    data: LinkedinStatusRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually mark a LinkedIn connection request as accepted or declined.
+    Automatic detection via LinkedIn /v2/invitations polling is deferred until
+    Partner API access is granted."""
+    if data.status not in ("accepted", "declined"):
+        raise HTTPException(status_code=400, detail="status must be 'accepted' or 'declined'")
+
+    result = await db.execute(select(Message).where(Message.id == message_id))
+    message = result.scalar_one_or_none()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if message.channel != "linkedin":
+        raise HTTPException(status_code=400, detail=f"Only LinkedIn messages can be marked — this is {message.channel}")
+
+    message.extra_data = {**(message.extra_data or {}), "linkedin_status": data.status}
+
+    activity = Activity(
+        lead_id=message.lead_id,
+        type=f"linkedin_connection_{data.status}",
+        channel="linkedin",
+        description=f"Connection request marked as {data.status}",
+    )
+    db.add(activity)
+    await db.commit()
+    return {"status": "ok", "linkedin_status": data.status, "message_id": str(message_id)}
 
 
 @router.post("/{message_id}/reject")

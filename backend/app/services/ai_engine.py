@@ -40,10 +40,19 @@ class AIEngine:
         if industry_key in INDUSTRY_VOICE_OVERRIDES:
             system += "\n\n" + INDUSTRY_VOICE_OVERRIDES[industry_key]
 
-        # Channel-specific instructions
+        # Channel-specific instructions. LinkedIn connection_request has a separate
+        # rule further down because 300 chars is a hard limit, not a guideline.
+        is_linkedin_connection_request = (channel == "linkedin" and message_type == "connection_request")
         channel_notes = {
             "email": "Write a professional email with subject line and body. Keep it under 200 words.",
-            "linkedin": "Write a LinkedIn connection request note (max 300 characters) or InMail message (max 500 words).",
+            "linkedin": (
+                "Write a LinkedIn connection request note. HARD LIMIT: 300 characters "
+                "total including signature. Warm, human, conversational. Sign with 'Radhika' "
+                "only (no company, no phone — those are visible on the LinkedIn profile). "
+                "Return subject as null."
+            ) if is_linkedin_connection_request else (
+                "Write a LinkedIn InMail message. Keep it under 500 words."
+            ),
             "whatsapp": "Write a concise, professional WhatsApp message. Max 3-4 short paragraphs.",
             "instagram": "Write a brief, professional Instagram DM. Keep it under 150 words.",
         }
@@ -56,6 +65,12 @@ class AIEngine:
             "festive_gifting": "This is a seasonal outreach related to festive corporate gifting (Diwali, New Year, etc.).",
             "event_triggered": "This outreach is triggered by a specific company event. Reference the event naturally.",
             "referral": "Someone referred us to this contact. Mention the referral source.",
+            "connection_request": (
+                "This is a LinkedIn connection request note sent 1 day after an email. "
+                "Reference the email naturally (e.g. 'sent you an email yesterday about X'). "
+                "DO NOT re-pitch the company — you already did that in the email. Just warmly "
+                "extend the invitation to connect on LinkedIn as well. Under 300 characters, strict."
+            ),
         }
 
         prompt = f"""Generate a {channel} {message_type} message for the following lead:

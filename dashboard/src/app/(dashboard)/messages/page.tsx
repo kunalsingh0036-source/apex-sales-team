@@ -19,7 +19,14 @@ interface MessageItem {
   ai_suggested_reply: string | null;
   sent_at: string | null;
   created_at: string;
-  extra_data?: { last_error?: string | null; attachments?: { filename: string; size: number; content_type: string }[] };
+  extra_data?: {
+    last_error?: string | null;
+    attachments?: { filename: string; size: number; content_type: string }[];
+    linkedin_type?: string;
+    linkedin_status?: string;
+    needs_linkedin_url?: boolean;
+    profile_url?: string;
+  };
 }
 
 const CLASSIFICATION_COLORS: Record<string, "success" | "crimson" | "warning" | "info" | "default"> = {
@@ -425,7 +432,7 @@ export default function MessagesPage() {
               onClick={() => setSelectedMessage(msg)}
             >
               <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant={msg.direction === "inbound" ? "info" : "default"}>
                     {msg.direction === "inbound" ? "IN" : "OUT"}
                   </Badge>
@@ -438,6 +445,21 @@ export default function MessagesPage() {
                   <Badge variant={msg.status === "sent" ? "success" : msg.status === "failed" ? "crimson" : "default"}>
                     {msg.status}
                   </Badge>
+                  {msg.channel === "linkedin" && msg.extra_data?.linkedin_status && msg.extra_data.linkedin_status !== msg.status && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                      msg.extra_data.linkedin_status === "accepted" ? "bg-green-100 text-green-900" :
+                      msg.extra_data.linkedin_status === "declined" ? "bg-red-100 text-red-900" :
+                      msg.extra_data.linkedin_status === "sent" ? "bg-amber-100 text-amber-900" :
+                      "bg-gray-200 text-gray-800"
+                    }`}>
+                      LN: {msg.extra_data.linkedin_status}
+                    </span>
+                  )}
+                  {msg.channel === "linkedin" && msg.extra_data?.needs_linkedin_url && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                      NO LINKEDIN URL
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs text-mid-warm">
                   {msg.sent_at
@@ -712,25 +734,73 @@ export default function MessagesPage() {
               </div>
             )}
 
+            {/* LinkedIn missing URL warning (special case) */}
+            {selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-900">
+                <span className="font-bold">LinkedIn URL missing:</span> this lead has no linkedin_url on record. Open the lead and add one before approving, or reject this step.
+              </div>
+            )}
+
+            {/* LinkedIn status badge for sent linkedin messages */}
+            {selectedMessage.channel === "linkedin" && selectedMessage.status === "sent" && (
+              <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-mid-warm">Connection:</span>
+                {(() => {
+                  const s = selectedMessage.extra_data?.linkedin_status || "sent";
+                  const label: Record<string, { text: string; color: string }> = {
+                    sent: { text: "Sent — awaiting response", color: "bg-amber-100 text-amber-900" },
+                    accepted: { text: "Accepted", color: "bg-green-100 text-green-900" },
+                    declined: { text: "Declined / ignored", color: "bg-red-100 text-red-900" },
+                  };
+                  const b = label[s] || label.sent;
+                  return <span className={`text-xs font-bold px-3 py-1 rounded-full ${b.color}`}>{b.text}</span>;
+                })()}
+                {selectedMessage.extra_data?.linkedin_status !== "accepted" && selectedMessage.extra_data?.linkedin_status !== "declined" && (
+                  <>
+                    <Button size="sm" onClick={async () => {
+                      try {
+                        await api.messages.markLinkedinStatus(selectedMessage.id, "accepted");
+                        toast("Marked as accepted.", "success");
+                        setSelectedMessage({ ...selectedMessage, extra_data: { ...selectedMessage.extra_data, linkedin_status: "accepted" } });
+                        fetchMessages();
+                      } catch (err: any) { toast(err.message, "error"); }
+                    }}>Mark Accepted</Button>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      try {
+                        await api.messages.markLinkedinStatus(selectedMessage.id, "declined");
+                        toast("Marked as declined.", "info");
+                        setSelectedMessage({ ...selectedMessage, extra_data: { ...selectedMessage.extra_data, linkedin_status: "declined" } });
+                        fetchMessages();
+                      } catch (err: any) { toast(err.message, "error"); }
+                    }}>Mark Declined</Button>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Approve / Schedule / Reject / Regenerate for content_review */}
             {(selectedMessage.status === "content_review" || selectedMessage.status === "failed") && (
               <div className="mb-6 space-y-3">
                 <div className="flex flex-col md:flex-row gap-2">
-                  <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving}>
-                    {approving ? "Sending..." : "Send Now"}
+                  <Button size="sm" onClick={() => handleApprove(selectedMessage.id)} disabled={approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}>
+                    {approving
+                      ? "Sending..."
+                      : selectedMessage.channel === "linkedin"
+                        ? "Send Connection Request"
+                        : "Send Now"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     const tomorrow9am = new Date();
                     tomorrow9am.setDate(tomorrow9am.getDate() + 1);
                     tomorrow9am.setHours(9, 0, 0, 0);
                     handleApprove(selectedMessage.id, tomorrow9am.toISOString());
-                  }} disabled={approving}>
+                  }} disabled={approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}>
                     Tomorrow 9 AM
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     const in2h = new Date(Date.now() + 2 * 60 * 60 * 1000);
                     handleApprove(selectedMessage.id, in2h.toISOString());
-                  }} disabled={approving}>
+                  }} disabled={approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}>
                     In 2 Hours
                   </Button>
                 </div>
