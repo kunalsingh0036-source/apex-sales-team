@@ -58,6 +58,7 @@ export default function MessagesPage() {
   });
   const [approving, setApproving] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [pickedSchedule, setPickedSchedule] = useState<string>("");
   const [selectedMessage, setSelectedMessage] = useState<MessageItem | null>(null);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [editEmail, setEditEmail] = useState("");
@@ -837,12 +838,20 @@ export default function MessagesPage() {
                         : "Send Now"}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
-                    const tomorrow9am = new Date();
-                    tomorrow9am.setDate(tomorrow9am.getDate() + 1);
-                    tomorrow9am.setHours(9, 0, 0, 0);
-                    handleApprove(selectedMessage.id, tomorrow9am.toISOString());
+                    // Next working day at 9 AM IST — skip Sat/Sun
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+                    d.setHours(9, 0, 0, 0);
+                    handleApprove(selectedMessage.id, d.toISOString());
                   }} disabled={approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}>
-                    Tomorrow 9 AM
+                    {(() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+                      const label = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+                      return `${label} 9 AM`;
+                    })()}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     const in2h = new Date(Date.now() + 2 * 60 * 60 * 1000);
@@ -851,17 +860,37 @@ export default function MessagesPage() {
                     In 2 Hours
                   </Button>
                 </div>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="datetime-local"
-                    className="px-3 py-1.5 border border-rich-creme rounded text-sm"
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleApprove(selectedMessage.id, new Date(e.target.value).toISOString());
+                <div className="flex flex-col md:flex-row gap-2 items-start md:items-center p-3 bg-creme/30 rounded border border-rich-creme/60">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-label text-[10px] tracking-wider text-mid-warm uppercase">Schedule for a custom time</span>
+                    <input
+                      type="datetime-local"
+                      value={pickedSchedule}
+                      onChange={(e) => setPickedSchedule(e.target.value)}
+                      className="px-3 py-1.5 border border-rich-creme rounded text-sm bg-white"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (!pickedSchedule) {
+                        toast("Pick a date and time first", "error");
+                        return;
                       }
+                      const when = new Date(pickedSchedule);
+                      if (when.getTime() < Date.now()) {
+                        toast("That time is in the past — pick a future time", "error");
+                        return;
+                      }
+                      handleApprove(selectedMessage.id, when.toISOString());
+                      setPickedSchedule("");
                     }}
-                  />
-                  <span className="text-xs text-mid-warm">Pick a date and time</span>
+                    disabled={!pickedSchedule || approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}
+                  >
+                    {pickedSchedule
+                      ? `Schedule for ${new Date(pickedSchedule).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                      : "Schedule"}
+                  </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => startEdit(selectedMessage)}>
