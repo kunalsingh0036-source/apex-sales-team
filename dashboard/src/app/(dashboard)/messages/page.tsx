@@ -860,16 +860,13 @@ export default function MessagesPage() {
                     In 2 Hours
                   </Button>
                 </div>
-                <div className="flex flex-col md:flex-row gap-2 items-start md:items-center p-3 bg-creme/30 rounded border border-rich-creme/60">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-label text-[10px] tracking-wider text-mid-warm uppercase">Schedule for a custom time</span>
-                    <input
-                      type="datetime-local"
-                      value={pickedSchedule}
-                      onChange={(e) => setPickedSchedule(e.target.value)}
-                      className="px-3 py-1.5 border border-rich-creme rounded text-sm bg-white"
-                    />
-                  </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="datetime-local"
+                    value={pickedSchedule}
+                    onChange={(e) => setPickedSchedule(e.target.value)}
+                    className="px-3 py-1.5 border border-rich-creme rounded text-sm"
+                  />
                   <Button
                     size="sm"
                     onClick={() => {
@@ -887,9 +884,7 @@ export default function MessagesPage() {
                     }}
                     disabled={!pickedSchedule || approving || (selectedMessage.channel === "linkedin" && selectedMessage.extra_data?.needs_linkedin_url)}
                   >
-                    {pickedSchedule
-                      ? `Schedule for ${new Date(pickedSchedule).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
-                      : "Schedule"}
+                    Schedule
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
