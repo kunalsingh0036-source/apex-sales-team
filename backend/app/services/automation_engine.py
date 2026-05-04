@@ -11,7 +11,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.lead import Lead, Company
+from app.models.lead import Lead, Company, LeadBatch
 from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.activity import Activity
 from app.models.user import SystemSetting
@@ -57,6 +57,17 @@ TIER_STRATEGY = {
     "medium": (["email"], 2),
     "cold": (["email"], 3),
 }
+
+# Hard cap on how many leads autopilot processes per batch. Going wide is
+# tempting but makes tracking impossible — the team has explicitly chosen
+# 20-at-a-time so each batch B-xxxx is a coherent wave they can manage end-
+# to-end before the next one starts.
+BATCH_SIZE = 20
+
+# Auto-trigger cadence for the next batch when the previous one is still
+# active. If the latest batch was created more than this many days ago, the
+# daily check fires the next batch even if the prior one isn't fully done.
+ALTERNATE_DAY_GAP_HOURS = 36  # 1.5 days — accommodates "every alternate day"
 
 
 def _score_tier(score: int) -> str:
@@ -114,13 +125,94 @@ class AutomationEngine:
         history["runs"] = runs[-50:]
         await self._upsert_setting(db, "autopilot_history", history)
 
+    # ─── Batch helpers ────────────────────────────────────────
+
+    async def create_new_batch(
+        self,
+        db: AsyncSession,
+        triggered_by: str = "manual",
+        notes: str = "",
+    ) -> LeadBatch:
+        """Create a new LeadBatch row. The DB sequence + trigger fill in
+        batch_number and batch_code automatically — we just commit."""
+        batch = LeadBatch(
+            triggered_by=triggered_by,
+            target_lead_count=BATCH_SIZE,
+            status="active",
+            notes=notes,
+        )
+        db.add(batch)
+        await db.flush()
+        await db.refresh(batch)
+        logger.info(f"Created batch {batch.batch_code} (triggered_by={triggered_by})")
+        return batch
+
+    async def get_latest_batch(self, db: AsyncSession) -> LeadBatch | None:
+        result = await db.execute(
+            select(LeadBatch).order_by(LeadBatch.batch_number.desc()).limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def is_batch_complete(self, batch: LeadBatch, db: AsyncSession) -> bool:
+        """A batch is complete when no leads in it have an active enrollment.
+
+        That covers all the real cases: replied (enrollment.status='replied'),
+        finished the sequence (enrollment.status='completed'), DNC'd, no email
+        in the first place, never enrolled at all. If even one enrollment is
+        still 'active' we keep the batch open."""
+        active_q = await db.execute(
+            select(func.count(CampaignEnrollment.id))
+            .join(Lead, CampaignEnrollment.lead_id == Lead.id)
+            .where(
+                Lead.batch_id == batch.id,
+                CampaignEnrollment.status == "active",
+            )
+        )
+        active_count = active_q.scalar() or 0
+        return active_count == 0
+
+    async def mark_batch_complete(self, batch: LeadBatch, db: AsyncSession) -> None:
+        batch.status = "complete"
+        batch.completed_at = datetime.now(IST)
+        await db.flush()
+
+    async def reconcile_batch_completion(self, db: AsyncSession) -> dict:
+        """Sweep all active batches; mark any that have finished as complete.
+        Called by the daily trigger before deciding whether to create a new batch."""
+        result = await db.execute(
+            select(LeadBatch).where(LeadBatch.status == "active")
+        )
+        batches = result.scalars().all()
+        marked = 0
+        for batch in batches:
+            if await self.is_batch_complete(batch, db):
+                await self.mark_batch_complete(batch, db)
+                marked += 1
+        if marked:
+            await db.commit()
+        return {"checked": len(batches), "marked_complete": marked}
+
     # ─── Stage 1: Discover Leads ──────────────────────────────
 
-    async def discover_leads(self, db: AsyncSession) -> dict:
+    async def discover_leads(
+        self,
+        db: AsyncSession,
+        batch: LeadBatch | None = None,
+    ) -> dict:
+        """Discover up to BATCH_SIZE leads and stamp them with the given batch.
+
+        If `batch` is None, a new one is created with triggered_by='manual'.
+        Apollo is still asked for a wide pool (since we de-dupe against
+        existing leads) but we stop ingesting after BATCH_SIZE NEW leads
+        land in the DB — extras are discarded, not held."""
+        if batch is None:
+            batch = await self.create_new_batch(db, triggered_by="manual")
+            await db.commit()
+
         icp = await self.get_icp(db)
-        settings = await self.get_settings(db)
-        aggr = AGGRESSIVENESS_MAP.get(settings.get("aggressiveness", "normal"), AGGRESSIVENESS_MAP["normal"])
-        max_results = min(icp.get("max_results", 50), aggr["max_results"])
+        # Ask Apollo for ~3x the batch size so dedup-skips don't starve the batch.
+        # We hard-cap the actual leads inserted at BATCH_SIZE below.
+        per_page = min(BATCH_SIZE * 3, 100)
 
         search_result = await lead_discovery.search_people(
             job_titles=icp.get("job_titles"),
@@ -128,7 +220,7 @@ class AutomationEngine:
             locations=icp.get("locations"),
             company_sizes=icp.get("company_sizes"),
             keywords=icp.get("keywords"),
-            per_page=max_results,
+            per_page=per_page,
         )
 
         if "error" in search_result and search_result["error"]:
@@ -139,6 +231,11 @@ class AutomationEngine:
         skipped = 0
 
         for person in people:
+            # Hard stop once the batch is full. We don't keep extras for next
+            # time — next batch will run a fresh Apollo search with current ICP.
+            if discovered >= BATCH_SIZE:
+                break
+
             email = person.get("email")
             linkedin = person.get("linkedin_url")
 
@@ -175,6 +272,7 @@ class AutomationEngine:
 
             lead = Lead(
                 company_id=company_id,
+                batch_id=batch.id,
                 first_name=person.get("first_name", "Unknown"),
                 last_name=person.get("last_name", ""),
                 email=email,
@@ -197,13 +295,23 @@ class AutomationEngine:
                 lead_id=lead.id,
                 type="autopilot_discovery",
                 channel="system",
-                description=f"Auto-discovered via Apollo (autopilot)",
-                extra_data={"source": "autopilot", "company": company_data.get("name", "")},
+                description=f"Auto-discovered via Apollo into batch {batch.batch_code}",
+                extra_data={
+                    "source": "autopilot",
+                    "company": company_data.get("name", ""),
+                    "batch_code": batch.batch_code,
+                },
             ))
             discovered += 1
 
         await db.commit()
-        result = {"discovered": discovered, "skipped": skipped, "total_searched": len(people)}
+        result = {
+            "discovered": discovered,
+            "skipped": skipped,
+            "total_searched": len(people),
+            "batch_id": str(batch.id),
+            "batch_code": batch.batch_code,
+        }
         await self._log_run(db, "discover", result)
         return result
 
@@ -311,7 +419,18 @@ class AutomationEngine:
 
     # ─── Stage 4: Create Campaigns ────────────────────────────
 
-    async def create_campaigns(self, db: AsyncSession) -> dict:
+    async def create_campaigns(
+        self,
+        db: AsyncSession,
+        batch: LeadBatch | None = None,
+    ) -> dict:
+        """Enroll eligible leads into tier campaigns.
+
+        When `batch` is provided, only leads belonging to that batch are
+        considered — keeps batches as discrete waves. When None, falls back
+        to the legacy behavior (any unenrolled autopilot lead) which is now
+        only used by manual ad-hoc operations.
+        """
         settings = await self.get_settings(db)
         aggr_config = AGGRESSIVENESS_MAP.get(settings.get("aggressiveness", "normal"), AGGRESSIVENESS_MAP["normal"])
 
@@ -323,21 +442,23 @@ class AutomationEngine:
         )
 
         # Get eligible autopilot leads (eagerly load company to avoid lazy-load crashes)
+        conditions = [
+            Lead.source == "autopilot",
+            Lead.lead_score > 0,
+            Lead.do_not_contact == False,
+            Lead.consent_status != "opted_out",
+            Lead.consent_status != "invalid_email",
+            Lead.email.isnot(None),
+            Lead.email != "",
+            Lead.id.notin_(enrolled_subq),
+        ]
+        if batch is not None:
+            conditions.append(Lead.batch_id == batch.id)
+
         query = (
             select(Lead)
             .options(selectinload(Lead.company))
-            .where(
-                and_(
-                    Lead.source == "autopilot",
-                    Lead.lead_score > 0,
-                    Lead.do_not_contact == False,
-                    Lead.consent_status != "opted_out",
-                    Lead.consent_status != "invalid_email",
-                    Lead.email.isnot(None),
-                    Lead.email != "",
-                    Lead.id.notin_(enrolled_subq),
-                )
-            )
+            .where(and_(*conditions))
         )
         result = await db.execute(query)
         leads = result.scalars().all()
@@ -386,14 +507,20 @@ class AutomationEngine:
             if max_enroll <= 0:
                 continue
 
+            batch_label = f" {batch.batch_code}" if batch is not None else ""
+            target_filter = {
+                "tier": tier,
+                "source": "autopilot",
+            }
+            if batch is not None:
+                target_filter["batch_id"] = str(batch.id)
+                target_filter["batch_code"] = batch.batch_code
+
             campaign = Campaign(
-                name=f"Autopilot: {tier} leads ({today})",
+                name=f"Autopilot:{batch_label} {tier} leads ({today})",
                 sequence_id=sequence.id,
                 status="active",
-                target_filter={
-                    "tier": tier,
-                    "source": "autopilot",
-                },
+                target_filter=target_filter,
                 total_leads=max_enroll,
                 started_at=datetime.now(IST),
             )
@@ -479,24 +606,55 @@ class AutomationEngine:
 
     # ─── Full Cycle ───────────────────────────────────────────
 
-    async def run_full_cycle(self, db: AsyncSession) -> dict:
-        if not await self.is_enabled(db):
+    async def run_full_cycle(
+        self,
+        db: AsyncSession,
+        triggered_by: str = "manual",
+        force: bool = False,
+    ) -> dict:
+        """Run one batch end-to-end: create batch → discover 20 → enrich →
+        ensure sequences → enroll into campaigns. Each invocation produces
+        exactly one B-xxxx batch.
+
+        `triggered_by` is recorded on the LeadBatch row for auditability:
+        - "manual" — user clicked the Generate Batch button
+        - "auto_alternate_day" — daily timer fired because it's been ~2d
+        - "auto_after_completion" — daily timer fired because prior batch done
+        - "backfill" — only used by migration 007
+        `force=True` skips the autopilot-disabled check (used by manual button)."""
+        if not force and not await self.is_enabled(db):
             return {"skipped": True, "reason": "autopilot_disabled"}
 
-        results = {}
+        results: dict = {}
 
-        # Step 1: Discover
+        # Create the new batch row first so every downstream step can scope to it.
         try:
-            results["discover"] = await self.discover_leads(db)
+            batch = await self.create_new_batch(db, triggered_by=triggered_by)
+            await db.commit()
+            results["batch"] = {
+                "id": str(batch.id),
+                "batch_code": batch.batch_code,
+                "triggered_by": triggered_by,
+            }
+        except Exception as e:
+            logger.error(f"Autopilot batch creation failed: {e}")
+            return {"error": f"batch_creation_failed: {e}"}
+
+        # Step 1: Discover up to 20 leads INTO this batch
+        try:
+            results["discover"] = await self.discover_leads(db, batch=batch)
         except Exception as e:
             logger.error(f"Autopilot discover failed: {e}")
             results["discover"] = {"error": str(e)}
 
-        # Step 2: Enrich unscored autopilot leads
+        # Step 2: Enrich just this batch's unscored leads (not the whole DB)
         try:
             unscored = await db.execute(
                 select(Lead.id).where(
-                    and_(Lead.source == "autopilot", Lead.lead_score == 0)
+                    and_(
+                        Lead.batch_id == batch.id,
+                        Lead.lead_score == 0,
+                    )
                 )
             )
             lead_ids = [str(lid) for lid in unscored.scalars().all()]
@@ -508,21 +666,73 @@ class AutomationEngine:
             logger.error(f"Autopilot enrich failed: {e}")
             results["enrich"] = {"error": str(e)}
 
-        # Step 3: Ensure sequences
+        # Step 3: Ensure sequences (singleton — universal multi-channel)
         try:
             results["sequences"] = await self.ensure_sequences(db)
         except Exception as e:
             logger.error(f"Autopilot sequences failed: {e}")
             results["sequences"] = {"error": str(e)}
 
-        # Step 4: Campaigns (always run — pipeline refills when approval queue is empty)
+        # Step 4: Enroll only THIS batch's leads into tier campaigns.
         try:
-            results["campaigns"] = await self.create_campaigns(db)
+            results["campaigns"] = await self.create_campaigns(db, batch=batch)
         except Exception as e:
             logger.error(f"Autopilot campaigns failed: {e}")
             results["campaigns"] = {"error": str(e)}
 
         return results
+
+    async def maybe_run_next_batch(self, db: AsyncSession) -> dict:
+        """Daily decision: should a new batch be created right now?
+
+        Rules:
+        1. If there's no batch yet → fire one (triggered_by='auto_alternate_day').
+        2. Reconcile: mark any active batches as complete if their leads have
+           no remaining active enrollments.
+        3. If the latest batch is now complete → fire one
+           (triggered_by='auto_after_completion').
+        4. Else if the latest batch was created more than ALTERNATE_DAY_GAP_HOURS
+           ago → fire one (triggered_by='auto_alternate_day').
+        5. Otherwise skip — too early.
+        """
+        if not await self.is_enabled(db):
+            return {"skipped": True, "reason": "autopilot_disabled"}
+
+        # Step 1 + 2: reconcile completion state up front
+        await self.reconcile_batch_completion(db)
+
+        latest = await self.get_latest_batch(db)
+        if latest is None:
+            logger.info("No batches yet — firing first batch via auto trigger")
+            return await self.run_full_cycle(db, triggered_by="auto_alternate_day", force=True)
+
+        if latest.status == "complete":
+            logger.info(
+                f"Latest batch {latest.batch_code} is complete — firing next batch"
+            )
+            return await self.run_full_cycle(db, triggered_by="auto_after_completion", force=True)
+
+        # Still active — check the alternate-day timer
+        now = datetime.now(IST)
+        created = latest.created_at
+        if created.tzinfo is None:
+            # treat naive timestamps as UTC then convert
+            created = created.replace(tzinfo=ZoneInfo("UTC"))
+        age_hours = (now - created.astimezone(IST)).total_seconds() / 3600.0
+        if age_hours >= ALTERNATE_DAY_GAP_HOURS:
+            logger.info(
+                f"Latest batch {latest.batch_code} is {age_hours:.1f}h old — alternate-day trigger firing"
+            )
+            return await self.run_full_cycle(db, triggered_by="auto_alternate_day", force=True)
+
+        return {
+            "skipped": True,
+            "reason": "too_early",
+            "latest_batch_code": latest.batch_code,
+            "latest_batch_status": latest.status,
+            "latest_batch_age_hours": round(age_hours, 1),
+            "next_trigger_at_hours": ALTERNATE_DAY_GAP_HOURS,
+        }
 
 
 automation_engine = AutomationEngine()

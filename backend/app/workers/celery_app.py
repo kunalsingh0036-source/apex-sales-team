@@ -85,6 +85,13 @@ celery_app.conf.update(
             "task": "app.workers.automation_tasks.autopilot_weekly",
             "schedule": crontab(hour=7, minute=30, day_of_week=1),  # Monday 7:30 AM IST
         },
+        # Batch trigger — daily at 9 AM IST, decides whether to start the next
+        # B-xxxx batch based on whether the prior batch is complete OR is older
+        # than the alternate-day threshold (~36h). See maybe_run_next_batch.
+        "autopilot-batch-trigger-check": {
+            "task": "app.workers.automation_tasks.batch_trigger_check",
+            "schedule": crontab(hour=9, minute=0),  # 9:00 AM IST daily
+        },
     },
 )
 

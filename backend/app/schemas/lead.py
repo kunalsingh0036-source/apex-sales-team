@@ -94,10 +94,19 @@ class LeadUpdate(BaseModel):
     do_not_contact: Optional[bool] = None
 
 
+class BatchSummary(BaseModel):
+    id: uuid.UUID
+    batch_code: str
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
 class LeadResponse(BaseModel):
     id: uuid.UUID
     lead_number: int
     lead_code: str
+    batch_id: Optional[uuid.UUID] = None
     company_id: Optional[uuid.UUID]
     first_name: str
     last_name: str
@@ -126,6 +135,7 @@ class LeadResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     company: Optional[CompanyResponse] = None
+    batch: Optional[BatchSummary] = None
 
     model_config = {"from_attributes": True}
 

@@ -34,7 +34,7 @@ async def list_leads(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Lead).options(selectinload(Lead.company))
+    query = select(Lead).options(selectinload(Lead.company), selectinload(Lead.batch))
     count_query = select(func.count()).select_from(Lead)
 
     if stage:
@@ -126,7 +126,7 @@ async def create_lead(data: LeadCreate, db: AsyncSession = Depends(get_db)):
 @router.get("/{lead_id}", response_model=LeadResponse)
 async def get_lead(lead_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(Lead).options(selectinload(Lead.company)).where(Lead.id == lead_id)
+        select(Lead).options(selectinload(Lead.company), selectinload(Lead.batch)).where(Lead.id == lead_id)
     )
     lead = result.scalar_one_or_none()
     if not lead:
@@ -141,7 +141,7 @@ async def update_lead(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(Lead).options(selectinload(Lead.company)).where(Lead.id == lead_id)
+        select(Lead).options(selectinload(Lead.company), selectinload(Lead.batch)).where(Lead.id == lead_id)
     )
     lead = result.scalar_one_or_none()
     if not lead:
@@ -204,7 +204,7 @@ async def update_lead_stage(
         )
 
     result = await db.execute(
-        select(Lead).options(selectinload(Lead.company)).where(Lead.id == lead_id)
+        select(Lead).options(selectinload(Lead.company), selectinload(Lead.batch)).where(Lead.id == lead_id)
     )
     lead = result.scalar_one_or_none()
     if not lead:
@@ -267,7 +267,7 @@ async def get_lead_profile(
 
     # Lead (with company)
     lead_result = await db.execute(
-        select(Lead).options(selectinload(Lead.company)).where(Lead.id == lead_id)
+        select(Lead).options(selectinload(Lead.company), selectinload(Lead.batch)).where(Lead.id == lead_id)
     )
     lead = lead_result.scalar_one_or_none()
     if not lead:

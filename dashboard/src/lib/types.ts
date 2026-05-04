@@ -14,10 +14,33 @@ export interface Company {
   updated_at: string;
 }
 
+export interface BatchSummary {
+  id: string;
+  batch_code: string;
+  status: string;
+}
+
+export interface LeadBatch {
+  id: string;
+  batch_code: string;
+  batch_number: number;
+  status: "active" | "complete";
+  triggered_by: string;
+  target_lead_count: number;
+  actual_lead_count: number;
+  active_enrollments: number;
+  replied: number;
+  messages_sent: number;
+  completed_at: string | null;
+  created_at: string;
+}
+
 export interface Lead {
   id: string;
   lead_number: number;
   lead_code: string;
+  batch_id: string | null;
+  batch?: BatchSummary | null;
   company_id: string | null;
   first_name: string;
   last_name: string;

@@ -64,6 +64,8 @@ type ProfileLead = {
   id: string;
   lead_number: number;
   lead_code: string;
+  batch_id: string | null;
+  batch?: { id: string; batch_code: string; status: string } | null;
   first_name: string;
   last_name: string;
   full_name: string;
@@ -219,6 +221,15 @@ export default function LeadDetailPage() {
           {lead.full_name}
           {lead.lead_code && (
             <span className="ml-3 font-mono text-base md:text-lg text-mid-warm font-normal">· {lead.lead_code}</span>
+          )}
+          {lead.batch?.batch_code && (
+            <span className={`ml-3 font-mono text-sm md:text-base px-2 py-0.5 rounded align-middle ${
+              lead.batch.status === "complete"
+                ? "bg-green-100 text-green-900"
+                : "bg-creme text-crimson-dark"
+            }`}>
+              {lead.batch.batch_code}
+            </span>
           )}
         </h2>
       </div>

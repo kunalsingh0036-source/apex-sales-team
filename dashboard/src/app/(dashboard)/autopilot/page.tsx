@@ -29,6 +29,36 @@ export default function AutopilotPage() {
   const [campaignDay, setCampaignDay] = useState(0);
   const [aggressiveness, setAggressiveness] = useState("normal");
 
+  // Batches
+  const [batches, setBatches] = useState<any[]>([]);
+  const [generatingBatch, setGeneratingBatch] = useState(false);
+
+  async function loadBatches() {
+    try {
+      const data = await api.batches.list(20);
+      setBatches(data.batches || []);
+    } catch (err) {
+      console.error("batches load failed", err);
+    }
+  }
+
+  async function handleGenerateBatch() {
+    if (!confirm("Generate a new batch of 20 leads now? This will run discover + enrich + campaign creation.")) return;
+    setGeneratingBatch(true);
+    try {
+      const result = await api.batches.generate();
+      const code = result?.batch?.batch_code;
+      const discovered = result?.discover?.discovered ?? 0;
+      toast(`Created batch ${code || "?"} — discovered ${discovered} leads`, "success");
+      await loadBatches();
+      await loadData();
+    } catch (err: any) {
+      toast(err?.message || "Failed to generate batch", "error");
+    } finally {
+      setGeneratingBatch(false);
+    }
+  }
+
   async function loadData() {
     try {
       const statusData = await api.autopilot.status();
@@ -55,6 +85,7 @@ export default function AutopilotPage() {
 
   useEffect(() => {
     loadData();
+    loadBatches();
   }, []);
 
   async function handleToggle() {
@@ -190,6 +221,81 @@ export default function AutopilotPage() {
               {status?.active_campaigns ?? 0}
             </p>
           </div>
+        </div>
+
+        {/* Batches — the primary tracking unit going forward */}
+        <div className="bg-white rounded-xl p-6 border border-rich-creme">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="font-display text-lg font-bold text-crimson-dark">
+                Lead Batches
+              </h3>
+              <p className="text-sm text-mid-warm mt-1">
+                Each batch is a wave of up to 20 leads handled together. Auto-trigger fires every alternate day or when the prior batch is complete. Click below to generate one now.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleGenerateBatch}
+              disabled={generatingBatch}
+            >
+              {generatingBatch ? "Generating..." : "Generate Next Batch (20)"}
+            </Button>
+          </div>
+
+          {batches.length === 0 ? (
+            <p className="text-sm text-mid-warm italic">No batches yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-rich-creme bg-creme/40">
+                    <th className="text-left px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Batch</th>
+                    <th className="text-left px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Status</th>
+                    <th className="text-left px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Triggered</th>
+                    <th className="text-right px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Leads</th>
+                    <th className="text-right px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Sent</th>
+                    <th className="text-right px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Replied</th>
+                    <th className="text-right px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Active</th>
+                    <th className="text-left px-3 py-2 font-label text-[10px] tracking-[0.15em] text-mid-warm uppercase">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.id} className="border-b border-rich-creme/50 hover:bg-creme/30">
+                      <td className="px-3 py-2 font-mono font-bold text-crimson-dark whitespace-nowrap">
+                        {b.batch_code}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge variant={b.status === "complete" ? "success" : "default"}>
+                          {b.status}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-mid-warm">
+                        {b.triggered_by.replace(/_/g, " ")}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {b.actual_lead_count}/{b.target_lead_count}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{b.messages_sent}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{b.replied}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {b.active_enrollments > 0 ? (
+                          <span className="text-crimson-dark font-bold">{b.active_enrollments}</span>
+                        ) : (
+                          <span className="text-mid-warm">0</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-mid-warm whitespace-nowrap">
+                        {b.created_at ? new Date(b.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Manual Triggers */}

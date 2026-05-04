@@ -25,6 +25,38 @@ class Company(Base, UUIDMixin, TimestampMixin):
     events: Mapped[list["LeadEvent"]] = relationship(back_populates="company")
 
 
+class LeadBatch(Base, UUIDMixin, TimestampMixin):
+    """A wave of up to 20 leads processed together by autopilot.
+
+    Each batch gets a sequential B-xxxx code via the lead_batch_number_seq
+    sequence + set_lead_batch_code trigger (see migration 007_batches).
+    `triggered_by` records why this batch was created — manual button,
+    daily auto-trigger, or backfill of pre-batch leads.
+    """
+    __tablename__ = "lead_batches"
+
+    batch_number: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        unique=True,
+        server_default=text("nextval('lead_batch_number_seq'::regclass)"),
+    )
+    batch_code: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        index=True,
+        server_default=text("''"),
+    )
+    triggered_by: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
+    target_lead_count: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    extra_data: Mapped[dict] = mapped_column("extra_data", JSONB, nullable=False, default=dict)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="batch")
+
+
 class Lead(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "leads"
 
@@ -44,6 +76,13 @@ class Lead(Base, UUIDMixin, TimestampMixin):
         # Populated by the leads_set_code DB trigger; safe placeholder for
         # new INSERTs in tests/without-trigger contexts.
         server_default=text("''"),
+    )
+
+    # Which discovery wave this lead belongs to. Nullable because pre-batch
+    # leads (created before migration 007) are backfilled, but new manually-
+    # created leads can also exist outside any batch.
+    batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lead_batches.id"), nullable=True, index=True
     )
 
     company_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -80,6 +119,7 @@ class Lead(Base, UUIDMixin, TimestampMixin):
     )
 
     company: Mapped[Optional["Company"]] = relationship(back_populates="leads")
+    batch: Mapped[Optional["LeadBatch"]] = relationship("LeadBatch", back_populates="leads")
     activities: Mapped[list["Activity"]] = relationship("Activity", back_populates="lead")
     messages: Mapped[list["Message"]] = relationship("Message", back_populates="lead")
 

@@ -422,4 +422,15 @@ export const api = {
         results: Record<string, { id: string; title: string; subtitle: string; url: string; lead_code?: string }[]>;
       }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   },
+
+  // Batches (autopilot lead waves of 20)
+  batches: {
+    list: (limit = 50) =>
+      request<{ batches: any[]; total: number }>(`/automation/batches?limit=${limit}`),
+    get: (id: string) => request<any>(`/automation/batches/${id}`),
+    generate: () =>
+      request<any>("/automation/batches/generate", { method: "POST" }),
+    checkTrigger: () =>
+      request<any>("/automation/batches/check-trigger", { method: "POST" }),
+  },
 };

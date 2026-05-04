@@ -62,6 +62,9 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
               #
             </th>
             <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
+              Batch
+            </th>
+            <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
               Name
             </th>
             <th className="text-left px-4 py-3 font-label text-xs tracking-[0.15em] text-mid-warm uppercase">
@@ -94,6 +97,19 @@ export default function LeadTable({ leads, onEdit, onDelete }: LeadTableProps) {
             >
               <td className="px-4 py-3 font-mono text-xs text-mid-warm whitespace-nowrap">
                 {lead.lead_code}
+              </td>
+              <td className="px-4 py-3 font-mono text-xs whitespace-nowrap">
+                {lead.batch?.batch_code ? (
+                  <span className={`px-1.5 py-0.5 rounded font-bold ${
+                    lead.batch.status === "complete"
+                      ? "bg-green-100 text-green-900"
+                      : "bg-creme text-crimson-dark"
+                  }`}>
+                    {lead.batch.batch_code}
+                  </span>
+                ) : (
+                  <span className="text-mid-warm/60">—</span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <Link

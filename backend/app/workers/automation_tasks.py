@@ -94,6 +94,27 @@ def autopilot_full_cycle():
     return run_async(_run())
 
 
+@celery_app.task(name="app.workers.automation_tasks.batch_trigger_check")
+def batch_trigger_check():
+    """Daily check at 9 AM IST: should we kick off the next batch right now?
+
+    Logic lives in automation_engine.maybe_run_next_batch:
+    - If the latest batch is complete → fire next batch immediately.
+    - Else if the latest batch is ≥ ALTERNATE_DAY_GAP_HOURS old → fire next.
+    - Else skip and try again tomorrow.
+
+    Manual override: hit POST /api/v1/automation/batches/generate from the UI.
+    """
+    from app.services.automation_engine import automation_engine
+    from app.dependencies import create_worker_session
+
+    async def _run():
+        async with create_worker_session()() as db:
+            return await automation_engine.maybe_run_next_batch(db)
+
+    return run_async(_run())
+
+
 @celery_app.task(name="app.workers.automation_tasks.ensure_review_queue")
 def ensure_review_queue():
     """Keep the content_review queue full. If empty, trigger pipeline to refill."""
