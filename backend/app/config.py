@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -14,6 +15,27 @@ if _ENV_FILE.exists() and not os.environ.get("RAILWAY_ENVIRONMENT"):
 class Settings(BaseSettings):
     # Database
     database_url: str = os.environ.get("DATABASE_URL", "postgresql+asyncpg://apex:apex_dev_password@localhost:5432/apex_outreach")
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        """Railway sets DATABASE_URL=`postgresql://...` (bare, sync
+        driver). create_async_engine needs `postgresql+asyncpg://...`
+        — without that prefix every query 500s the moment the
+        connection is touched. Same pattern documented in
+        learnings_railway_migration.md.
+        """
+        if not v:
+            return v
+        if v.startswith("postgresql://"):
+            v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+        elif v.startswith("postgres://"):
+            v = "postgresql+asyncpg://" + v[len("postgres://"):]
+        if "?sslmode=" in v:
+            head, _, tail = v.partition("?sslmode=")
+            other = tail.split("&", 1)[1] if "&" in tail else ""
+            v = head + (("?" + other) if other else "")
+        return v
     database_url_sync: str = ""
 
     @property
