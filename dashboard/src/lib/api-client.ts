@@ -428,9 +428,39 @@ export const api = {
     list: (limit = 50) =>
       request<{ batches: any[]; total: number }>(`/automation/batches?limit=${limit}`),
     get: (id: string) => request<any>(`/automation/batches/${id}`),
-    generate: () =>
-      request<any>("/automation/batches/generate", { method: "POST" }),
+    generate: (profileId?: string) =>
+      request<any>("/automation/batches/generate", {
+        method: "POST",
+        body: profileId ? JSON.stringify({ profile_id: profileId }) : "{}",
+      }),
     checkTrigger: () =>
       request<any>("/automation/batches/check-trigger", { method: "POST" }),
+    repairOrphans: () =>
+      request<any>("/automation/batches/repair-all-orphans", { method: "POST" }),
+  },
+
+  // Lead profiles (search segments — schools, hotels, banks, etc. — that
+  // batches rotate through round-robin)
+  profiles: {
+    list: () => request<{ profiles: any[]; total: number }>("/automation/profiles"),
+    create: (data: {
+      code: string;
+      name: string;
+      description?: string;
+      search_params?: Record<string, any>;
+      is_active?: boolean;
+      rotation_priority?: number;
+    }) =>
+      request<any>("/automation/profiles", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Record<string, any>) =>
+      request<any>(`/automation/profiles/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<any>(`/automation/profiles/${id}`, { method: "DELETE" }),
   },
 };

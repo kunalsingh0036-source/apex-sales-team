@@ -25,6 +25,29 @@ class Company(Base, UUIDMixin, TimestampMixin):
     events: Mapped[list["LeadEvent"]] = relationship(back_populates="company")
 
 
+class LeadProfile(Base, UUIDMixin, TimestampMixin):
+    """A search-segment that batches rotate through.
+
+    Replaces the legacy single-ICP model. Each profile defines its own
+    Apollo search_params (job_titles, industries, locations, company_sizes,
+    keywords). The autopilot picks profiles round-robin by `last_used_at`
+    so every batch hits a fresh pool — drastically reducing dedup-skips
+    and giving the team segmented data ("how do schools convert vs hotels").
+    """
+    __tablename__ = "lead_profiles"
+
+    code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    search_params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    rotation_priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    stats: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    batches: Mapped[list["LeadBatch"]] = relationship("LeadBatch", back_populates="profile")
+
+
 class LeadBatch(Base, UUIDMixin, TimestampMixin):
     """A wave of up to 20 leads processed together by autopilot.
 
@@ -32,6 +55,8 @@ class LeadBatch(Base, UUIDMixin, TimestampMixin):
     sequence + set_lead_batch_code trigger (see migration 007_batches).
     `triggered_by` records why this batch was created — manual button,
     daily auto-trigger, or backfill of pre-batch leads.
+    `profile_id` records which segment profile the batch was generated for
+    (see migration 008_profiles).
     """
     __tablename__ = "lead_batches"
 
@@ -47,6 +72,9 @@ class LeadBatch(Base, UUIDMixin, TimestampMixin):
         index=True,
         server_default=text("''"),
     )
+    profile_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("lead_profiles.id"), nullable=True, index=True
+    )
     triggered_by: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
     target_lead_count: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
@@ -55,6 +83,7 @@ class LeadBatch(Base, UUIDMixin, TimestampMixin):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="batch")
+    profile: Mapped[Optional["LeadProfile"]] = relationship("LeadProfile", back_populates="batches")
 
 
 class Lead(Base, UUIDMixin, TimestampMixin):

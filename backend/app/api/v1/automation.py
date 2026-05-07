@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
 from app.models.user import SystemSetting
-from app.models.lead import Lead, LeadBatch
+from app.models.lead import Lead, LeadBatch, LeadProfile
 from app.models.sequence import CampaignEnrollment
 from app.models.message import Message
 from app.services.automation_engine import automation_engine
@@ -201,6 +201,17 @@ async def list_batches(
         )
         sent = sent_q.scalar() or 0
 
+        # Profile summary for the batch (one extra query per batch — fine
+        # at <100 batches; revisit if this list ever returns thousands)
+        profile_summary = None
+        if b.profile_id:
+            pq = await db.execute(
+                select(LeadProfile.code, LeadProfile.name).where(LeadProfile.id == b.profile_id)
+            )
+            row = pq.first()
+            if row:
+                profile_summary = {"code": row[0], "name": row[1]}
+
         out.append({
             "id": str(b.id),
             "batch_code": b.batch_code,
@@ -212,6 +223,7 @@ async def list_batches(
             "active_enrollments": active_enrollments,
             "replied": replied,
             "messages_sent": sent,
+            "profile": profile_summary,
             "completed_at": b.completed_at.isoformat() if b.completed_at else None,
             "created_at": b.created_at.isoformat() if b.created_at else None,
         })
@@ -259,16 +271,213 @@ async def get_batch(batch_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+class GenerateBatchRequest(BaseModel):
+    profile_id: Optional[str] = None  # If omitted, round-robin picks the LRU active profile
+
+
 @router.post("/batches/generate")
-async def generate_next_batch(db: AsyncSession = Depends(get_db)):
+async def generate_next_batch(
+    body: Optional[GenerateBatchRequest] = None,
+    db: AsyncSession = Depends(get_db),
+):
     """Manually trigger the next batch (skips autopilot-enabled gate so the
-    team can generate a batch even when autopilot is paused)."""
+    team can generate a batch even when autopilot is paused).
+
+    Body is optional. If provided, `profile_id` overrides round-robin and
+    forces this batch to use the named profile. Otherwise the active profile
+    with the oldest last_used_at fires next."""
+    import uuid as _uuid
+    pid = None
+    if body and body.profile_id:
+        try:
+            pid = _uuid.UUID(body.profile_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid profile_id")
+
     result = await automation_engine.run_full_cycle(
-        db, triggered_by="manual", force=True
+        db, triggered_by="manual", force=True, profile_id=pid
     )
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+
+# ─── Profile endpoints ────────────────────────────────────────
+
+class ProfileCreate(BaseModel):
+    code: str
+    name: str
+    description: str = ""
+    search_params: dict = {}
+    is_active: bool = True
+    rotation_priority: int = 100
+
+
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    search_params: Optional[dict] = None
+    is_active: Optional[bool] = None
+    rotation_priority: Optional[int] = None
+
+
+@router.get("/profiles")
+async def list_profiles(db: AsyncSession = Depends(get_db)):
+    """List all lead profiles (segments). Active profiles enter the
+    round-robin rotation; inactive ones don't but are kept for history."""
+    result = await db.execute(
+        select(LeadProfile).order_by(
+            LeadProfile.is_active.desc(),
+            LeadProfile.rotation_priority.asc(),
+        )
+    )
+    profiles = result.scalars().all()
+
+    out = []
+    for p in profiles:
+        # Aggregate stats: count batches, leads, sent, replied per profile
+        batch_count_q = await db.execute(
+            select(func.count(LeadBatch.id)).where(LeadBatch.profile_id == p.id)
+        )
+        batch_count = batch_count_q.scalar() or 0
+
+        lead_count_q = await db.execute(
+            select(func.count(Lead.id))
+            .join(LeadBatch, Lead.batch_id == LeadBatch.id)
+            .where(LeadBatch.profile_id == p.id)
+        )
+        lead_count = lead_count_q.scalar() or 0
+
+        replied_q = await db.execute(
+            select(func.count(CampaignEnrollment.id))
+            .join(Lead, CampaignEnrollment.lead_id == Lead.id)
+            .join(LeadBatch, Lead.batch_id == LeadBatch.id)
+            .where(LeadBatch.profile_id == p.id, CampaignEnrollment.status == "replied")
+        )
+        replied = replied_q.scalar() or 0
+
+        sent_q = await db.execute(
+            select(func.count(Message.id))
+            .join(Lead, Message.lead_id == Lead.id)
+            .join(LeadBatch, Lead.batch_id == LeadBatch.id)
+            .where(
+                LeadBatch.profile_id == p.id,
+                Message.direction == "outbound",
+                Message.status == "sent",
+            )
+        )
+        sent = sent_q.scalar() or 0
+
+        out.append({
+            "id": str(p.id),
+            "code": p.code,
+            "name": p.name,
+            "description": p.description,
+            "search_params": p.search_params,
+            "is_active": p.is_active,
+            "rotation_priority": p.rotation_priority,
+            "last_used_at": p.last_used_at.isoformat() if p.last_used_at else None,
+            "stats": {
+                "batches_run": batch_count,
+                "leads_generated": lead_count,
+                "messages_sent": sent,
+                "replied": replied,
+                "response_rate": round(replied / sent * 100, 1) if sent > 0 else None,
+            },
+        })
+
+    return {"profiles": out, "total": len(out)}
+
+
+@router.post("/profiles", status_code=201)
+async def create_profile(body: ProfileCreate, db: AsyncSession = Depends(get_db)):
+    """Create a new lead profile. The `code` must be unique."""
+    if not body.code or not body.name:
+        raise HTTPException(status_code=400, detail="code and name are required")
+
+    existing = await db.execute(select(LeadProfile).where(LeadProfile.code == body.code))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"Profile with code '{body.code}' already exists")
+
+    p = LeadProfile(
+        code=body.code,
+        name=body.name,
+        description=body.description,
+        search_params=body.search_params,
+        is_active=body.is_active,
+        rotation_priority=body.rotation_priority,
+    )
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return {
+        "id": str(p.id),
+        "code": p.code,
+        "name": p.name,
+        "is_active": p.is_active,
+    }
+
+
+@router.put("/profiles/{profile_id}")
+async def update_profile(
+    profile_id: str,
+    body: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a profile in-place. Code is immutable; everything else is editable."""
+    import uuid as _uuid
+    try:
+        pid = _uuid.UUID(profile_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid profile id")
+
+    result = await db.execute(select(LeadProfile).where(LeadProfile.id == pid))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    if body.name is not None:
+        p.name = body.name
+    if body.description is not None:
+        p.description = body.description
+    if body.search_params is not None:
+        p.search_params = body.search_params
+    if body.is_active is not None:
+        p.is_active = body.is_active
+    if body.rotation_priority is not None:
+        p.rotation_priority = body.rotation_priority
+
+    await db.commit()
+    return {"status": "updated", "id": str(p.id), "code": p.code}
+
+
+@router.delete("/profiles/{profile_id}")
+async def delete_profile(profile_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a profile. Refuses if any batches reference it — deactivate
+    the profile instead to remove it from rotation while keeping history."""
+    import uuid as _uuid
+    try:
+        pid = _uuid.UUID(profile_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid profile id")
+
+    result = await db.execute(select(LeadProfile).where(LeadProfile.id == pid))
+    p = result.scalar_one_or_none()
+    if not p:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    batch_count_q = await db.execute(
+        select(func.count(LeadBatch.id)).where(LeadBatch.profile_id == pid)
+    )
+    if (batch_count_q.scalar() or 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete profile with existing batches. Mark it inactive instead.",
+        )
+
+    await db.delete(p)
+    await db.commit()
+    return {"status": "deleted", "id": str(pid)}
 
 
 @router.post("/batches/check-trigger")

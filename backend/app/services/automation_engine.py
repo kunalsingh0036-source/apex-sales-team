@@ -4,6 +4,7 @@ and campaign creation pipeline. Reads configuration from system_settings table.
 """
 
 import logging
+import uuid
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -11,7 +12,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.lead import Lead, Company, LeadBatch
+from app.models.lead import Lead, Company, LeadBatch, LeadProfile
 from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.activity import Activity
 from app.models.user import SystemSetting
@@ -37,6 +38,24 @@ DEFAULT_ICP = {
     "company_sizes": ["201-500", "501-1000", "1001-5000", "5001-10000"],
     "keywords": [],
     "max_results": 50,
+}
+
+# Hardcoded fallback search params used when profile rotation fails for
+# any reason (no active profiles, DB error reading the profiles table,
+# malformed search_params, etc.). Intentionally wide so we never lose a
+# day to a config issue. Mirrors the historic broad ICP.
+FALLBACK_PROFILE_SEARCH = {
+    "job_titles": [
+        "Head of Procurement", "VP Operations", "HR Director", "Admin Manager",
+        "Brand Manager", "CHRO", "General Manager", "Director Operations",
+    ],
+    "industries": [
+        "Education Management", "Hospitality", "Pharmaceuticals", "Banking",
+        "Information Technology and Services", "Consumer Goods", "Real Estate",
+    ],
+    "locations": ["India"],
+    "company_sizes": ["201-500", "501-1000", "1001-5000"],
+    "keywords": [],
 }
 
 DEFAULT_SETTINGS = {
@@ -125,6 +144,51 @@ class AutomationEngine:
         history["runs"] = runs[-50:]
         await self._upsert_setting(db, "autopilot_history", history)
 
+    # ─── Profile helpers ──────────────────────────────────────
+
+    async def pick_next_profile(
+        self,
+        db: AsyncSession,
+        profile_id: uuid.UUID | None = None,
+    ) -> LeadProfile | None:
+        """Choose the profile a new batch should use.
+
+        Selection order:
+        1. If `profile_id` is explicitly given, return it (validated active).
+        2. Otherwise, pick the active profile with the OLDEST `last_used_at`
+           (NULLs first → never-used profiles get priority). Tie-break by
+           `rotation_priority ASC`. This is round-robin via least-recently-used.
+
+        Returns None if no active profiles exist. Caller must use the
+        FALLBACK_PROFILE_SEARCH in that case.
+        """
+        import uuid as _uuid
+
+        if profile_id is not None:
+            result = await db.execute(
+                select(LeadProfile).where(LeadProfile.id == profile_id)
+            )
+            p = result.scalar_one_or_none()
+            if p is None:
+                logger.warning(f"Requested profile_id {profile_id} not found")
+                return None
+            if not p.is_active:
+                logger.warning(
+                    f"Requested profile {p.code} is inactive — using anyway since "
+                    f"the operator explicitly chose it"
+                )
+            return p
+
+        # Round-robin LRU. NULLs FIRST so brand-new profiles fire before
+        # any profile gets a second turn.
+        result = await db.execute(
+            select(LeadProfile)
+            .where(LeadProfile.is_active == True)
+            .order_by(LeadProfile.last_used_at.asc().nullsfirst(), LeadProfile.rotation_priority.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     # ─── Batch helpers ────────────────────────────────────────
 
     async def create_new_batch(
@@ -132,19 +196,27 @@ class AutomationEngine:
         db: AsyncSession,
         triggered_by: str = "manual",
         notes: str = "",
+        profile: LeadProfile | None = None,
     ) -> LeadBatch:
         """Create a new LeadBatch row. The DB sequence + trigger fill in
-        batch_number and batch_code automatically — we just commit."""
+        batch_number and batch_code automatically — we just commit.
+
+        If `profile` is provided, the batch is stamped with profile_id and
+        the profile's last_used_at is bumped (so round-robin advances)."""
         batch = LeadBatch(
             triggered_by=triggered_by,
             target_lead_count=BATCH_SIZE,
             status="active",
             notes=notes,
+            profile_id=profile.id if profile is not None else None,
         )
         db.add(batch)
+        if profile is not None:
+            profile.last_used_at = datetime.now(IST)
         await db.flush()
         await db.refresh(batch)
-        logger.info(f"Created batch {batch.batch_code} (triggered_by={triggered_by})")
+        profile_label = f" profile={profile.code}" if profile else " profile=fallback"
+        logger.info(f"Created batch {batch.batch_code} (triggered_by={triggered_by}){profile_label}")
         return batch
 
     async def get_latest_batch(self, db: AsyncSession) -> LeadBatch | None:
@@ -204,22 +276,50 @@ class AutomationEngine:
         If `batch` is None, a new one is created with triggered_by='manual'.
         Apollo is still asked for a wide pool (since we de-dupe against
         existing leads) but we stop ingesting after BATCH_SIZE NEW leads
-        land in the DB — extras are discarded, not held."""
+        land in the DB — extras are discarded, not held.
+
+        Search params come from the batch's profile (round-robin rotation).
+        If the batch has no profile or the profile's search_params are
+        empty/malformed, falls back to FALLBACK_PROFILE_SEARCH so a config
+        error never fully stalls the funnel.
+        """
         if batch is None:
             batch = await self.create_new_batch(db, triggered_by="manual")
             await db.commit()
 
-        icp = await self.get_icp(db)
+        # Resolve search params: profile-driven, with fallback for safety
+        search = FALLBACK_PROFILE_SEARCH
+        profile_code = "fallback"
+        if batch.profile_id is not None:
+            try:
+                p_result = await db.execute(
+                    select(LeadProfile).where(LeadProfile.id == batch.profile_id)
+                )
+                p = p_result.scalar_one_or_none()
+                if p and isinstance(p.search_params, dict) and p.search_params:
+                    search = p.search_params
+                    profile_code = p.code
+                else:
+                    logger.warning(
+                        f"Batch {batch.batch_code} has profile_id but profile is missing "
+                        f"or has empty search_params — using fallback"
+                    )
+            except Exception as e:
+                logger.error(
+                    f"Failed to load profile for batch {batch.batch_code}: {e}. "
+                    f"Falling back to default search."
+                )
+
         # Ask Apollo for ~3x the batch size so dedup-skips don't starve the batch.
         # We hard-cap the actual leads inserted at BATCH_SIZE below.
         per_page = min(BATCH_SIZE * 3, 100)
 
         search_result = await lead_discovery.search_people(
-            job_titles=icp.get("job_titles"),
-            industries=icp.get("industries"),
-            locations=icp.get("locations"),
-            company_sizes=icp.get("company_sizes"),
-            keywords=icp.get("keywords"),
+            job_titles=search.get("job_titles"),
+            industries=search.get("industries"),
+            locations=search.get("locations"),
+            company_sizes=search.get("company_sizes"),
+            keywords=search.get("keywords"),
             per_page=per_page,
         )
 
@@ -311,6 +411,7 @@ class AutomationEngine:
             "total_searched": len(people),
             "batch_id": str(batch.id),
             "batch_code": batch.batch_code,
+            "profile": profile_code,
         }
         await self._log_run(db, "discover", result)
         return result
@@ -611,30 +712,48 @@ class AutomationEngine:
         db: AsyncSession,
         triggered_by: str = "manual",
         force: bool = False,
+        profile_id: uuid.UUID | None = None,
     ) -> dict:
-        """Run one batch end-to-end: create batch → discover 20 → enrich →
-        ensure sequences → enroll into campaigns. Each invocation produces
-        exactly one B-xxxx batch.
+        """Run one batch end-to-end: pick profile → create batch → discover 20
+        → enrich → ensure sequences → enroll into campaigns. Each invocation
+        produces exactly one B-xxxx batch.
 
         `triggered_by` is recorded on the LeadBatch row for auditability:
         - "manual" — user clicked the Generate Batch button
         - "auto_alternate_day" — daily timer fired because it's been ~2d
         - "auto_after_completion" — daily timer fired because prior batch done
         - "backfill" — only used by migration 007
-        `force=True` skips the autopilot-disabled check (used by manual button)."""
+        `force=True` skips the autopilot-disabled check (used by manual button).
+        `profile_id` overrides round-robin selection; otherwise pick_next_profile
+        chooses by least-recently-used.
+        """
         if not force and not await self.is_enabled(db):
             return {"skipped": True, "reason": "autopilot_disabled"}
 
         results: dict = {}
 
+        # Pick the profile this batch will hit. Round-robin LRU by default;
+        # explicit profile_id wins. Fallback to None if no active profiles
+        # exist — discover_leads will then use FALLBACK_PROFILE_SEARCH so we
+        # never fully stall the funnel even if the team disables every profile.
+        try:
+            profile = await self.pick_next_profile(db, profile_id=profile_id)
+        except Exception as e:
+            logger.error(f"Profile selection failed: {e}. Continuing with fallback.")
+            profile = None
+
         # Create the new batch row first so every downstream step can scope to it.
         try:
-            batch = await self.create_new_batch(db, triggered_by=triggered_by)
+            batch = await self.create_new_batch(
+                db, triggered_by=triggered_by, profile=profile
+            )
             await db.commit()
             results["batch"] = {
                 "id": str(batch.id),
                 "batch_code": batch.batch_code,
                 "triggered_by": triggered_by,
+                "profile_code": profile.code if profile else "fallback",
+                "profile_name": profile.name if profile else "Fallback search",
             }
         except Exception as e:
             logger.error(f"Autopilot batch creation failed: {e}")
@@ -715,7 +834,11 @@ class AutomationEngine:
 
         return results
 
-    async def maybe_run_next_batch(self, db: AsyncSession) -> dict:
+    async def maybe_run_next_batch(
+        self,
+        db: AsyncSession,
+        profile_id: uuid.UUID | None = None,
+    ) -> dict:
         """Daily decision: should a new batch be created right now?
 
         Rules:
@@ -737,13 +860,17 @@ class AutomationEngine:
         latest = await self.get_latest_batch(db)
         if latest is None:
             logger.info("No batches yet — firing first batch via auto trigger")
-            return await self.run_full_cycle(db, triggered_by="auto_alternate_day", force=True)
+            return await self.run_full_cycle(
+                db, triggered_by="auto_alternate_day", force=True, profile_id=profile_id
+            )
 
         if latest.status == "complete":
             logger.info(
                 f"Latest batch {latest.batch_code} is complete — firing next batch"
             )
-            return await self.run_full_cycle(db, triggered_by="auto_after_completion", force=True)
+            return await self.run_full_cycle(
+                db, triggered_by="auto_after_completion", force=True, profile_id=profile_id
+            )
 
         # Still active — check the alternate-day timer
         now = datetime.now(IST)
@@ -756,7 +883,9 @@ class AutomationEngine:
             logger.info(
                 f"Latest batch {latest.batch_code} is {age_hours:.1f}h old — alternate-day trigger firing"
             )
-            return await self.run_full_cycle(db, triggered_by="auto_alternate_day", force=True)
+            return await self.run_full_cycle(
+                db, triggered_by="auto_alternate_day", force=True, profile_id=profile_id
+            )
 
         return {
             "skipped": True,

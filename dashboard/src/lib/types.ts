@@ -20,6 +20,30 @@ export interface BatchSummary {
   status: string;
 }
 
+export interface LeadProfile {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  search_params: {
+    job_titles?: string[];
+    industries?: string[];
+    locations?: string[];
+    company_sizes?: string[];
+    keywords?: string[];
+  };
+  is_active: boolean;
+  rotation_priority: number;
+  last_used_at: string | null;
+  stats: {
+    batches_run: number;
+    leads_generated: number;
+    messages_sent: number;
+    replied: number;
+    response_rate: number | null;
+  };
+}
+
 export interface LeadBatch {
   id: string;
   batch_code: string;
