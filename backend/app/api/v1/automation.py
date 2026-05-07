@@ -276,3 +276,70 @@ async def check_batch_trigger(db: AsyncSession = Depends(get_db)):
     """Run the daily auto-trigger logic on demand. Used by the beat job
     and exposed here for manual debugging / forcing a re-evaluation."""
     return await automation_engine.maybe_run_next_batch(db)
+
+
+@router.post("/batches/{batch_id}/enroll-orphans")
+async def enroll_orphan_leads(batch_id: str, db: AsyncSession = Depends(get_db)):
+    """Retro-enroll leads in a batch that were discovered + enriched but
+    never made it into a campaign because the cron-driven create_campaigns
+    silently failed. Calls create_campaigns scoped to this batch only."""
+    import uuid as _uuid
+    try:
+        bid = _uuid.UUID(batch_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid batch id")
+
+    from app.models.lead import LeadBatch as _LeadBatch
+    result = await db.execute(select(_LeadBatch).where(_LeadBatch.id == bid))
+    batch = result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    # Reset batch status to active so completion logic re-evaluates after enrollment
+    batch.status = "active"
+    batch.completed_at = None
+    await automation_engine.ensure_sequences(db)
+    res = await automation_engine.create_campaigns(db, batch=batch)
+    return {
+        "batch_code": batch.batch_code,
+        "result": res,
+    }
+
+
+@router.post("/batches/repair-all-orphans")
+async def repair_all_orphan_batches(db: AsyncSession = Depends(get_db)):
+    """One-shot recovery: find every active batch with leads-but-no-enrollments
+    and run create_campaigns on each. Used to fix the B-0007..B-0012 mess
+    caused by the silent campaigns failure in cron context."""
+    from app.models.lead import LeadBatch as _LeadBatch
+
+    result = await db.execute(
+        select(_LeadBatch).order_by(_LeadBatch.batch_number.asc())
+    )
+    batches = result.scalars().all()
+
+    summaries = []
+    for batch in batches:
+        lead_count_q = await db.execute(
+            select(func.count(Lead.id)).where(Lead.batch_id == batch.id)
+        )
+        lead_count = lead_count_q.scalar() or 0
+        enr_count_q = await db.execute(
+            select(func.count(CampaignEnrollment.id))
+            .join(Lead, CampaignEnrollment.lead_id == Lead.id)
+            .where(Lead.batch_id == batch.id)
+        )
+        enr_count = enr_count_q.scalar() or 0
+
+        if lead_count > 0 and enr_count == 0 and batch.triggered_by != "backfill":
+            # Reactivate so the workflow treats it as in-progress
+            batch.status = "active"
+            batch.completed_at = None
+            res = await automation_engine.create_campaigns(db, batch=batch)
+            summaries.append({
+                "batch_code": batch.batch_code,
+                "lead_count": lead_count,
+                "result": res,
+            })
+
+    return {"repaired": summaries, "count": len(summaries)}

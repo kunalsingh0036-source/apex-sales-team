@@ -22,61 +22,38 @@ def run_async(coro):
 
 @celery_app.task(name="app.workers.automation_tasks.autopilot_daily")
 def autopilot_daily():
-    """Daily autopilot run: discover + enrich + ensure sequences. Runs at 8 AM IST."""
+    """Daily 8 AM IST entry point.
+
+    Now delegates to maybe_run_next_batch — it has the cooldown logic
+    (alternate-day or post-completion) so we never double-fire even with
+    multiple cron entries pointing at it. The legacy "discover + enrich +
+    sequences without campaigns" code path was a half-batch that left leads
+    orphaned and is gone for good.
+    """
     from app.services.automation_engine import automation_engine
     from app.dependencies import create_worker_session
-    from app.models.lead import Lead
 
     async def _run():
         async with create_worker_session()() as db:
-            if not await automation_engine.is_enabled(db):
-                return {"skipped": True, "reason": "autopilot_disabled"}
-
-            results = {}
-
-            # Discover
-            try:
-                results["discover"] = await automation_engine.discover_leads(db)
-            except Exception as e:
-                results["discover"] = {"error": str(e)}
-
-            # Enrich unscored autopilot leads
-            try:
-                unscored = await db.execute(
-                    select(Lead.id).where(
-                        and_(Lead.source == "autopilot", Lead.lead_score == 0)
-                    )
-                )
-                lead_ids = [str(lid) for lid in unscored.scalars().all()]
-                if lead_ids:
-                    results["enrich"] = await automation_engine.enrich_and_score_leads(lead_ids, db)
-                else:
-                    results["enrich"] = {"enriched": 0, "note": "no_unscored_leads"}
-            except Exception as e:
-                results["enrich"] = {"error": str(e)}
-
-            # Ensure sequences
-            try:
-                results["sequences"] = await automation_engine.ensure_sequences(db)
-            except Exception as e:
-                results["sequences"] = {"error": str(e)}
-
-            return results
+            return await automation_engine.maybe_run_next_batch(db)
 
     return run_async(_run())
 
 
 @celery_app.task(name="app.workers.automation_tasks.autopilot_weekly")
 def autopilot_weekly():
-    """Weekly campaign creation. Runs Monday 7:30 AM IST."""
+    """Legacy weekly task — also delegates to maybe_run_next_batch.
+
+    Kept registered so any beat schedule entries pointing at it still fire
+    something safe. The actual rhythm is governed by ALTERNATE_DAY_GAP_HOURS
+    inside maybe_run_next_batch, not by which cron alias triggered it.
+    """
     from app.services.automation_engine import automation_engine
     from app.dependencies import create_worker_session
 
     async def _run():
         async with create_worker_session()() as db:
-            if not await automation_engine.is_enabled(db):
-                return {"skipped": True, "reason": "autopilot_disabled"}
-            return await automation_engine.create_campaigns(db)
+            return await automation_engine.maybe_run_next_batch(db)
 
     return run_async(_run())
 

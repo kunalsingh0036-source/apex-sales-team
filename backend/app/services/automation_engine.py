@@ -674,11 +674,44 @@ class AutomationEngine:
             results["sequences"] = {"error": str(e)}
 
         # Step 4: Enroll only THIS batch's leads into tier campaigns.
+        # Critical: this stage was silently failing in cron context for days
+        # because connection state corruption between stages caused the commit
+        # inside create_campaigns to throw, and the exception was caught here
+        # without any history record. Now every run logs a final summary
+        # capturing every stage's outcome — if campaigns is "missing" or has
+        # an "error" key, the team can see it.
         try:
             results["campaigns"] = await self.create_campaigns(db, batch=batch)
         except Exception as e:
-            logger.error(f"Autopilot campaigns failed: {e}")
-            results["campaigns"] = {"error": str(e)}
+            logger.error(
+                f"Autopilot campaigns failed for batch {batch.batch_code}: "
+                f"{type(e).__name__}: {e}"
+            )
+            results["campaigns"] = {
+                "error": f"{type(e).__name__}: {str(e)}",
+                "batch_code": batch.batch_code,
+            }
+
+        # Always-on summary entry. Even if every stage errored, this lands.
+        # _log_run uses its own commit so an upstream session corruption
+        # won't lose this signal.
+        try:
+            await self._log_run(db, "run_full_cycle", {
+                "triggered_by": triggered_by,
+                "batch_code": batch.batch_code,
+                "discovered": (results.get("discover") or {}).get("discovered", 0),
+                "enriched": (results.get("enrich") or {}).get("enriched", 0),
+                "campaigns_created": (results.get("campaigns") or {}).get("campaigns_created", 0),
+                "leads_enrolled": (results.get("campaigns") or {}).get("leads_enrolled", 0),
+                "stage_errors": [
+                    s for s in ("discover", "enrich", "sequences", "campaigns")
+                    if isinstance(results.get(s), dict) and "error" in results[s]
+                ],
+            })
+        except Exception as e:
+            # Last-resort log — if even the summary commit fails, push the
+            # failure to the worker stderr so Railway captures it.
+            logger.error(f"Failed to write run_full_cycle summary: {e}")
 
         return results
 

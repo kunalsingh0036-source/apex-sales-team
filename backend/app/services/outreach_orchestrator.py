@@ -84,11 +84,16 @@ class OutreachOrchestrator:
             enrollment.status = "completed"
             return False
 
-        # Contact guard check
-        from app.services.contact_guard import can_contact
-        allowed, reason = await can_contact(lead, db)
-        if not allowed:
-            logger.info(f"Contact guard blocked {lead.email}: {reason}")
+        # Contact guard: bypassed inside the orchestrator because by the time
+        # we're here the lead is already on a deliberate sequence with its own
+        # delay_days timing. The contact_guard's 14-day cooldown exists to
+        # prevent opportunistic double-touches across channels, not to block a
+        # planned step-2 follow-up that the team approved when enrolling. This
+        # mirrors the bypass already in place in approve_message for messages
+        # tied to an enrollment_id. Hard guards still apply: do_not_contact is
+        # checked above, and consent_status is filtered at create_campaigns.
+        if lead.do_not_contact or lead.consent_status in ("opted_out", "invalid_email"):
+            logger.info(f"Hard guard blocked {lead.email}: do_not_contact / consent")
             return False
 
         # NOTE: No cross-channel cooldown check here — deliberate sequence steps
