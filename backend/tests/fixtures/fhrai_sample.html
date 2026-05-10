@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head><title>FHRAI Member Directory</title></head>
+<body>
+<h1>FHRAI Member List</h1>
+<div class="member-list">
+
+  <!-- Variant A entry: full member-list-item with all fields -->
+  <div class="member-list-item">
+    <h3 class="member-name">The Taj Lake Palace</h3>
+    <p class="address">Pichola Lake, City Palace Complex, Udaipur, Rajasthan 313001</p>
+    <p class="phone">+91-294-242-8800</p>
+    <a href="mailto:reservations@tajlakepalace.com">reservations@tajlakepalace.com</a>
+    <a href="https://www.tajhotels.com">www.tajhotels.com</a>
+  </div>
+
+  <!-- Entry with phone embedded in free text, no .phone class -->
+  <div class="member-list-item">
+    <h3 class="member-name">ITC Grand Chola Chennai</h3>
+    <p class="address">Mount Road, Guindy, Chennai, Tamil Nadu 600032</p>
+    <p>Tel: +91-44-2220-0000 | Manager: General Operations</p>
+    <a href="https://www.itchotels.com">itchotels.com</a>
+  </div>
+
+  <!-- Entry without email or website, just name + address + phone -->
+  <div class="member-list-item">
+    <h3 class="member-name">Hotel Sea Princess Mumbai</h3>
+    <p class="address">Juhu Beach, Mumbai, Maharashtra 400049</p>
+    <p>Phone: 022-2661-1111</p>
+  </div>
+
+  <!-- Entry with too-short name — should be skipped by the parser -->
+  <div class="member-list-item">
+    <h3 class="member-name">A</h3>
+    <p>Some short stub that shouldn't be a real lead.</p>
+  </div>
+
+  <!-- Entry with no name element at all — should be skipped -->
+  <div class="member-list-item">
+    <p>Missing name field — orphan listing.</p>
+  </div>
+
+  <!-- Entry with an entirely empty member-name — should be skipped -->
+  <div class="member-list-item">
+    <h3 class="member-name"></h3>
+    <p class="address">Unnamed Hotel, Somewhere</p>
+  </div>
+
+</div>
+</body>
+</html>

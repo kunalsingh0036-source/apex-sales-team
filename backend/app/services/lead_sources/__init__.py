@@ -39,6 +39,7 @@ from app.services.lead_sources.base import (
 # Order doesn't matter — registry is a dict keyed by source name.
 from app.services.lead_sources import apollo as _apollo  # noqa: F401
 from app.services.lead_sources import passive as _passive  # noqa: F401
+from app.services.lead_sources import fhrai_scraper as _fhrai  # noqa: F401
 
 __all__ = [
     "LeadSource",

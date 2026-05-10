@@ -73,8 +73,11 @@ def upgrade():
     # 2. Generate a webhook secret if it doesn't exist. Idempotent — never
     # overwrites an existing secret because that would break the deployed
     # website's hardcoded value.
+    # NOTE: system_settings has `key` as its primary key — there is no `id`
+    # column. Earlier version of this migration tried SELECT id ... and
+    # crashed alembic on the prod DB, leaving 009 + 010 unapplied for days.
     row = conn.execute(
-        sa.text("SELECT id FROM system_settings WHERE key = 'inbound_webhook_secret'")
+        sa.text("SELECT key FROM system_settings WHERE key = 'inbound_webhook_secret'")
     ).first()
     if not row:
         secret = secrets.token_urlsafe(32)
