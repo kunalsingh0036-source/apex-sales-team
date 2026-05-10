@@ -104,6 +104,23 @@ class SchoolsScraper:
             except Exception as e:
                 logger.error(f"Schools state '{slug}' parse failed: {e}")
                 continue
+
+            # Diagnostic: when a state returns 0, log enough to tell whether
+            # the page was bot-blocked (small HTML, "Cloudflare" / "captcha"
+            # markers) vs a real parser miss vs an empty state directory.
+            if not state_results:
+                lower = html[:5000].lower()
+                hints = []
+                if "cloudflare" in lower: hints.append("cloudflare")
+                if "captcha" in lower: hints.append("captcha")
+                if "denied" in lower: hints.append("access-denied")
+                if "<title>just a moment" in lower: hints.append("cf-challenge")
+                hint_str = f" hints={hints}" if hints else ""
+                logger.info(
+                    f"Schools state '{slug}' parsed 0 schools "
+                    f"(html_bytes={len(html)}{hint_str})"
+                )
+
             results.extend(state_results)
 
         return results[:limit]
