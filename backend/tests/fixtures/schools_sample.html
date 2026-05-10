@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><title>Top CBSE Schools in Delhi</title></head>
+<body>
+<div class="list-group">
+
+  <a href="new-delhi/070507ND706/navyug-sr-secondary-school.html"
+     class="list-group-item list-group-item-action">
+    <span class="mr-1 text-red">➲</span>
+    NAVYUG SR. SECONDARY SCHOOL, SAROJNI NAGAR NEW DELHI
+    <small>NEW DELHI</small>
+  </a>
+
+  <a href="new-delhi/070507ND902/another-school.html"
+     class="list-group-item list-group-item-action">
+    <span class="mr-1 text-red">➲</span>
+    NP CO-ED SECONDARY SCHOOL NO.3, BABU MARKET
+    <small>NEW DELHI</small>
+  </a>
+
+  <!-- Mixed-case name should be preserved -->
+  <a href="south-delhi/070901ND501/mater-dei.html"
+     class="list-group-item list-group-item-action">
+    <span class="mr-1 text-red">➲</span>
+    Mater Dei School, Tilak Lane New Delhi
+    <small>SOUTH DELHI</small>
+  </a>
+
+  <!-- Edge case: empty anchor, should be skipped -->
+  <a href="#" class="list-group-item list-group-item-action"></a>
+
+  <!-- Edge case: too-short name, should be skipped -->
+  <a href="x/y.html" class="list-group-item list-group-item-action">
+    A
+    <small>NEW DELHI</small>
+  </a>
+
+</div>
+</body>
+</html>

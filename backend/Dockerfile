@@ -13,15 +13,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Chromium for Playwright. --with-deps pulls every apt package the
-# bundled Chromium needs (fonts, libnss, libdrm, libgbm, etc.). Adds ~300MB
-# but lets us scrape Indian institutional sites that block plain HTTP clients
-# (FHRAI ASP.NET WebForms, CISCE Cloudflare, GeM AJAX).
+# Install Chromium for Playwright. We pin PLAYWRIGHT_BROWSERS_PATH to a
+# stable, predictable location so the binaries survive across HOME changes
+# (e.g., Railway running with a different default HOME at runtime than at
+# build time). Without this, `playwright install` downloads to ~/.cache/...
+# which can disappear, leaving the Python lib unable to find Chromium.
 #
-# We only install chromium (not firefox/webkit) because Chromium has the
-# best compatibility with Cloudflare bot challenges and ASP.NET sites. If
-# a target site requires Firefox specifically, add it back here.
-RUN playwright install --with-deps chromium
+# We install both `chromium` (full browser) and `chromium-headless-shell`
+# (lightweight binary used by `chromium.launch(headless=True)` since
+# Playwright 1.49). Skipping either causes "Executable doesn't exist" at
+# runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium chromium-headless-shell
 
 COPY . .
 
