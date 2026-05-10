@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head><title>GeM | All Bids</title></head>
+<body>
+<div id="bidCard">
+
+  <!-- A real-shaped bid: defence dept, uniform-related items -->
+  <div class="card">
+    <div class="block_header">
+      <p class="bid_no pull-left">
+        <span class="bid_title">BID NO:&nbsp;</span>
+        <a class="bid_no_hover" href="/showbidDocument/9999001" target="_blank">GEM/2026/B/7000001</a>
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="row">
+            <strong>Items:</strong>&nbsp;
+            <a data-toggle="popover" data-content="Cotton polo t-shirts with embroidered logo, 200 GSM, navy blue, sizes M-XXL">Cotton polo t-shirts with embroide...</a>
+          </div>
+          <div class="row"><strong>Quantity:</strong>&nbsp;5000</div>
+        </div>
+        <div class="col-md-5">
+          <div class="row"><strong>Department Name And Address:</strong>&nbsp;</div>
+          <div class="row">Ministry of Defence<br>Department of Military Affairs</div>
+        </div>
+        <div class="col-md-3">
+          <div class="row"><strong>Start Date:</strong>&nbsp;<span class="start_date">10-04-2026 3:44 PM</span></div>
+          <div class="row"><strong>End Date:</strong>&nbsp;<span class="end_date">25-05-2026 9:00 AM</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Non-uniform bid: should be filtered out by keyword filter -->
+  <div class="card">
+    <div class="block_header">
+      <p class="bid_no pull-left">
+        <span class="bid_title">BID NO:&nbsp;</span>
+        <a class="bid_no_hover" href="/showbidDocument/9999002" target="_blank">GEM/2026/B/7000002</a>
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="row">
+            <strong>Items:</strong>&nbsp;
+            <a data-toggle="popover" data-content="Toner cartridges for HP LaserJet printers">Toner cartridges...</a>
+          </div>
+          <div class="row"><strong>Quantity:</strong>&nbsp;50</div>
+        </div>
+        <div class="col-md-5">
+          <div class="row"><strong>Department Name And Address:</strong>&nbsp;</div>
+          <div class="row">Department of Atomic Energy</div>
+        </div>
+        <div class="col-md-3">
+          <div class="row"><strong>Start Date:</strong>&nbsp;<span class="start_date">12-04-2026 10:00 AM</span></div>
+          <div class="row"><strong>End Date:</strong>&nbsp;<span class="end_date">15-05-2026 5:00 PM</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Uniform bid for a school (different keyword match) -->
+  <div class="card">
+    <div class="block_header">
+      <p class="bid_no pull-left">
+        <span class="bid_title">BID NO:&nbsp;</span>
+        <a class="bid_no_hover" href="/showbidDocument/9999003" target="_blank">GEM/2026/B/7000003</a>
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="row">
+            <strong>Items:</strong>&nbsp;
+            School uniform shirts and pinafores for Kendriya Vidyalaya
+          </div>
+          <div class="row"><strong>Quantity:</strong>&nbsp;1200</div>
+        </div>
+        <div class="col-md-5">
+          <div class="row"><strong>Department Name And Address:</strong>&nbsp;</div>
+          <div class="row">Ministry of Education<br>Kendriya Vidyalaya Sangathan</div>
+        </div>
+        <div class="col-md-3">
+          <div class="row"><strong>Start Date:</strong>&nbsp;<span class="start_date">15-04-2026 8:00 AM</span></div>
+          <div class="row"><strong>End Date:</strong>&nbsp;<span class="end_date">30-05-2026 5:00 PM</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edge case: bid with no department name — should be skipped -->
+  <div class="card">
+    <div class="block_header">
+      <p class="bid_no pull-left">
+        <span class="bid_title">BID NO:&nbsp;</span>
+        <a class="bid_no_hover" href="/showbidDocument/9999004" target="_blank">GEM/2026/B/7000004</a>
+      </p>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="row"><strong>Items:</strong>&nbsp;Some uniform item</div>
+          <div class="row"><strong>Quantity:</strong>&nbsp;100</div>
+        </div>
+        <div class="col-md-5">
+          <div class="row"><strong>Department Name And Address:</strong>&nbsp;</div>
+        </div>
+        <div class="col-md-3"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

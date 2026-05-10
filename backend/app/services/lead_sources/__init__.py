@@ -41,6 +41,7 @@ from app.services.lead_sources import apollo as _apollo  # noqa: F401
 from app.services.lead_sources import passive as _passive  # noqa: F401
 from app.services.lead_sources import fhrai_scraper as _fhrai  # noqa: F401
 from app.services.lead_sources import schools_scraper as _schools  # noqa: F401
+from app.services.lead_sources import gem_tenders as _gem  # noqa: F401
 
 __all__ = [
     "LeadSource",
