@@ -2,50 +2,80 @@
 <html>
 <head><title>FHRAI Member Directory</title></head>
 <body>
-<h1>FHRAI Member List</h1>
-<div class="member-list">
+<form>
+<table class="table table-bordered search_member_tb">
+  <thead>
+    <tr>
+      <th><a id="LnkName" class="WH" href="javascript:__doPostBack('LnkName','')">Establishment Name</a></th>
+      <th><a id="LnkCity" class="WH" href="javascript:__doPostBack('LnkCity','')">City</a></th>
+      <th><a id="LnkCategory" class="WH" href="javascript:__doPostBack('LnkCategory','')">Category</a></th>
+      <th>Website</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Empty separator row that FHRAI emits between data rows -->
+    <tr></tr>
 
-  <!-- Variant A entry: full member-list-item with all fields -->
-  <div class="member-list-item">
-    <h3 class="member-name">The Taj Lake Palace</h3>
-    <p class="address">Pichola Lake, City Palace Complex, Udaipur, Rajasthan 313001</p>
-    <p class="phone">+91-294-242-8800</p>
-    <a href="mailto:reservations@tajlakepalace.com">reservations@tajlakepalace.com</a>
-    <a href="https://www.tajhotels.com">www.tajhotels.com</a>
-  </div>
+    <!-- Real data: name + city + category + website -->
+    <tr>
+      <td>
+        <a href="javascript:void(0)" onclick="ViewInvoicedetails('guid-1');" style="border:none;color:black;">
+          THE TAJ LAKE PALACE
+        </a>
+      </td>
+      <td>Udaipur</td>
+      <td>5 Star</td>
+      <td><a href="https://www.tajhotels.com">Visit</a></td>
+    </tr>
 
-  <!-- Entry with phone embedded in free text, no .phone class -->
-  <div class="member-list-item">
-    <h3 class="member-name">ITC Grand Chola Chennai</h3>
-    <p class="address">Mount Road, Guindy, Chennai, Tamil Nadu 600032</p>
-    <p>Tel: +91-44-2220-0000 | Manager: General Operations</p>
-    <a href="https://www.itchotels.com">itchotels.com</a>
-  </div>
+    <!-- Empty separator -->
+    <tr></tr>
 
-  <!-- Entry without email or website, just name + address + phone -->
-  <div class="member-list-item">
-    <h3 class="member-name">Hotel Sea Princess Mumbai</h3>
-    <p class="address">Juhu Beach, Mumbai, Maharashtra 400049</p>
-    <p>Phone: 022-2661-1111</p>
-  </div>
+    <!-- Another row, no website link -->
+    <tr>
+      <td>
+        <a href="javascript:void(0)" onclick="ViewInvoicedetails('guid-2');" style="border:none;color:black;">
+          12TH AVENUE
+        </a>
+      </td>
+      <td>Bengaluru</td>
+      <td>Unclassified</td>
+      <td></td>
+    </tr>
 
-  <!-- Entry with too-short name — should be skipped by the parser -->
-  <div class="member-list-item">
-    <h3 class="member-name">A</h3>
-    <p>Some short stub that shouldn't be a real lead.</p>
-  </div>
+    <tr></tr>
 
-  <!-- Entry with no name element at all — should be skipped -->
-  <div class="member-list-item">
-    <p>Missing name field — orphan listing.</p>
-  </div>
+    <!-- Mixed-case name (already title-cased) — should NOT be re-normalized -->
+    <tr>
+      <td>
+        <a href="javascript:void(0)" onclick="ViewInvoicedetails('guid-3');" style="border:none;color:black;">
+          ITC Grand Chola Chennai
+        </a>
+      </td>
+      <td>Chennai</td>
+      <td>5 Star</td>
+      <td><a href="https://www.itchotels.com">www.itchotels.com</a></td>
+    </tr>
 
-  <!-- Entry with an entirely empty member-name — should be skipped -->
-  <div class="member-list-item">
-    <h3 class="member-name"></h3>
-    <p class="address">Unnamed Hotel, Somewhere</p>
-  </div>
+    <tr></tr>
 
-</div>
+    <!-- Edge case: empty name cell — must be skipped -->
+    <tr>
+      <td></td>
+      <td>Mumbai</td>
+      <td>Unclassified</td>
+      <td></td>
+    </tr>
+
+    <tr></tr>
+
+    <!-- Edge case: row with only one cell — must be skipped -->
+    <tr>
+      <td>Footer notice</td>
+    </tr>
+
+  </tbody>
+</table>
+</form>
 </body>
 </html>

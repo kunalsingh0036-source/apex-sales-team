@@ -39,8 +39,12 @@ passlib[bcrypt]==1.7.4
 python-dateutil==2.9.0
 
 # Web scraping (custom lead sources — FHRAI, CBSE, GeM)
+# Playwright drives a headless Chromium so we can scrape JS-rendered and
+# WAF-protected Indian institutional sites that plain HTTP clients can't reach.
+# Pinned: 1.49.0 is the latest stable as of 2026-05; bump quarterly with `playwright install`.
 beautifulsoup4==4.12.3
 lxml==5.3.0
+playwright==1.49.0
 
 # Tests
 pytest==8.3.4

@@ -66,9 +66,24 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("All startup checks passed")
 
+    # Pre-warm Playwright Chromium so the first scraper request doesn't pay
+    # the 2-5s cold-launch cost. Failures are logged but don't block startup
+    # — scrapers degrade to empty results, the rest of the app keeps working.
+    try:
+        from app.services.browser import browser_service
+        await browser_service.startup()
+        logger.info("  ✓ Playwright Chromium pre-warmed")
+    except Exception as e:
+        logger.warning(f"  ! Playwright pre-warm failed (scrapers will retry on first use): {e}")
+
     yield
 
     # Shutdown
+    try:
+        from app.services.browser import browser_service
+        await browser_service.shutdown()
+    except Exception:
+        pass
     try:
         from app.dependencies import engine
         await engine.dispose()
