@@ -1,30 +1,28 @@
-FROM python:3.12-slim
+# Microsoft's official Playwright Python image — Ubuntu 24.04 noble with
+# Python 3.12 + Chromium preinstalled at /ms-playwright. We picked this
+# over python:3.12-slim because:
+#   1. Playwright's `--with-deps` step kept failing on Debian slim (tried
+#      to install Ubuntu-only font packages: ttf-unifont, ttf-ubuntu-font-family)
+#   2. Microsoft maintains this image — every Playwright release ships a
+#      matching tag with all browser deps verified
+#   3. Chromium binaries are pre-baked at /ms-playwright in the image, so
+#      we don't pay download time on every build (~150MB saved)
+FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
 
 WORKDIR /app
 
+# Install Postgres client headers for asyncpg/psycopg2 wheels. Ubuntu base
+# already has python3 + most build essentials; we just need the pq dev libs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev && \
+    libpq-dev gcc && \
     rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Chromium for Playwright. We pin PLAYWRIGHT_BROWSERS_PATH to a
-# stable absolute location so the binaries survive across HOME changes
-# (Railway's runtime container can have a different default HOME than the
-# build image, which would otherwise leave the binaries inaccessible).
-#
-# Both `chromium` (full browser) and `chromium-headless-shell` are needed:
-# Playwright 1.49+ uses the headless-shell binary for `chromium.launch
-# (headless=True)`. Skipping either causes "Executable doesn't exist" at
-# runtime.
-#
-# --with-deps pulls every apt package the bundled Chromium needs (fonts,
-# libnss, libgbm, libdrm, etc.). Adds ~300MB to the image but is the only
-# way to scrape JS-rendered Indian institutional sites (FHRAI WebForms,
-# CISCE Cloudflare, GeM AJAX).
+# Tell Playwright where to find its pre-installed browsers in this image.
+# Microsoft's image stages them at /ms-playwright by convention.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN playwright install --with-deps chromium chromium-headless-shell
 
 COPY backend/ .
 
