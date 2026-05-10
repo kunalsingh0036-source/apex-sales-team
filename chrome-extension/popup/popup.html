@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Apex Lead Capture</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <h1>Apex Lead Capture</h1>
+    <a href="#" id="open-options" class="link-small">Settings</a>
+  </div>
+
+  <div id="status-area" class="status status-info">Loading…</div>
+
+  <div id="capture-area" class="hidden">
+    <p class="capture-summary"><span id="lead-count">0</span> leads ready from <span id="source-name">—</span></p>
+    <p class="capture-source" id="source-url"></p>
+    <button id="submit-btn" class="primary">Submit to Apex</button>
+    <p id="submit-result" class="result hidden"></p>
+  </div>
+
+  <div id="empty-area" class="hidden">
+    <p class="muted">No leads captured on this page yet.</p>
+    <p class="muted small">Visit a supported page (FHRAI, schools.org.in, GeM, LinkedIn Sales Nav) and the extension will detect leads automatically.</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

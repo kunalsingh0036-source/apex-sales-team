@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Apex Lead Capture — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Apex Lead Capture</h1>
+    <p class="muted">Configure your API token and backend URL.</p>
+
+    <section>
+      <h2>API token</h2>
+      <p class="muted small">
+        Generate this from the Apex dashboard → Settings → Extension Tokens.
+        Format: <code>apex_ext_…</code>
+      </p>
+      <input id="token-input" type="password" placeholder="apex_ext_xxxxxxxxxx" autocomplete="off" />
+      <div class="row">
+        <button id="save-btn" class="primary">Save</button>
+        <button id="show-btn" class="secondary">Show</button>
+      </div>
+      <p id="save-result" class="result hidden"></p>
+    </section>
+
+    <section>
+      <h2>Backend URL</h2>
+      <p class="muted small">Default: production Apex agent on Railway. Only change for local dev.</p>
+      <input id="api-url-input" type="text" placeholder="https://...railway.app/api/v1" />
+    </section>
+
+    <section>
+      <h2>Test connection</h2>
+      <button id="probe-btn" class="secondary">Probe /whoami</button>
+      <p id="probe-result" class="result hidden"></p>
+    </section>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

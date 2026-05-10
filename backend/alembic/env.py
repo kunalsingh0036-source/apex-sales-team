@@ -37,6 +37,7 @@ if config.config_file_name is not None:
 from app.models.base import Base
 from app.models.user import User, SystemSetting
 from app.models.lead import Company, Lead, LeadEvent
+from app.models.extension_token import ExtensionToken
 from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.message import MessageTemplate, Message
 from app.models.activity import Activity
