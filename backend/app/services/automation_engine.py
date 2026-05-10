@@ -17,6 +17,7 @@ from app.models.sequence import Sequence, Campaign, CampaignEnrollment
 from app.models.activity import Activity
 from app.models.user import SystemSetting
 from app.services.lead_discovery import lead_discovery
+from app.services.lead_sources import get_source, UnknownSourceError
 from app.services.enrichment_service import enrichment_service
 from app.services.ai_engine import ai_engine
 from app.core.rate_limiter import rate_limiter
@@ -287,46 +288,70 @@ class AutomationEngine:
             batch = await self.create_new_batch(db, triggered_by="manual")
             await db.commit()
 
-        # Resolve search params: profile-driven, with fallback for safety
-        search = FALLBACK_PROFILE_SEARCH
-        profile_code = "fallback"
+        # Resolve the profile this batch dispatches to. Adapter selection
+        # happens via profile.source (apollo / fhrai_scraper / cbse_scraper /
+        # gem_tenders / passive sources / etc.). If profile lookup fails for
+        # any reason, fall through to a synthetic apollo profile carrying
+        # FALLBACK_PROFILE_SEARCH — keeps the funnel moving even on config error.
+        profile: LeadProfile | None = None
         if batch.profile_id is not None:
             try:
                 p_result = await db.execute(
                     select(LeadProfile).where(LeadProfile.id == batch.profile_id)
                 )
-                p = p_result.scalar_one_or_none()
-                if p and isinstance(p.search_params, dict) and p.search_params:
-                    search = p.search_params
-                    profile_code = p.code
-                else:
-                    logger.warning(
-                        f"Batch {batch.batch_code} has profile_id but profile is missing "
-                        f"or has empty search_params — using fallback"
-                    )
+                profile = p_result.scalar_one_or_none()
             except Exception as e:
                 logger.error(
                     f"Failed to load profile for batch {batch.batch_code}: {e}. "
                     f"Falling back to default search."
                 )
 
-        # Ask Apollo for ~3x the batch size so dedup-skips don't starve the batch.
-        # We hard-cap the actual leads inserted at BATCH_SIZE below.
-        per_page = min(BATCH_SIZE * 3, 100)
+        if profile is None or not (isinstance(profile.search_params, dict) and profile.search_params):
+            if profile is None:
+                logger.warning(
+                    f"Batch {batch.batch_code} has no resolvable profile — using fallback search via apollo"
+                )
+            else:
+                logger.warning(
+                    f"Profile {profile.code} has empty search_params — using fallback search via apollo"
+                )
+            # Build a transient profile for the adapter so its contract holds.
+            # Not persisted; only lives for this discovery call.
+            profile = LeadProfile(
+                code="fallback",
+                name="Fallback search",
+                source="apollo",
+                search_params=FALLBACK_PROFILE_SEARCH,
+            )
 
-        search_result = await lead_discovery.search_people(
-            job_titles=search.get("job_titles"),
-            industries=search.get("industries"),
-            locations=search.get("locations"),
-            company_sizes=search.get("company_sizes"),
-            keywords=search.get("keywords"),
-            per_page=per_page,
-        )
+        profile_code = profile.code
 
-        if "error" in search_result and search_result["error"]:
-            return {"error": search_result["error"], "discovered": 0, "skipped": 0}
+        # Dispatch to the source adapter registered for profile.source.
+        # Wrap in try/except so an unknown source name (typo / deleted
+        # adapter) downgrades to fallback rather than crashing the batch.
+        try:
+            source = get_source(profile.source or "apollo")
+        except UnknownSourceError as e:
+            logger.error(
+                f"Profile {profile.code} references unknown source {profile.source!r}. "
+                f"Available: {e.available}. Falling back to apollo."
+            )
+            source = get_source("apollo")
 
-        people = search_result.get("people", [])
+        try:
+            people = await source.search(profile, BATCH_SIZE)
+        except Exception as e:
+            logger.error(
+                f"Source adapter {source.name!r} crashed for profile {profile_code}: {e}. "
+                f"Returning empty discovery — batch will still be created so rotation advances."
+            )
+            people = []
+
+        if not isinstance(people, list):
+            logger.error(
+                f"Source adapter {source.name!r} returned non-list {type(people).__name__} — coercing to []"
+            )
+            people = []
         discovered = 0
         skipped = 0
 
@@ -412,6 +437,7 @@ class AutomationEngine:
             "batch_id": str(batch.id),
             "batch_code": batch.batch_code,
             "profile": profile_code,
+            "source": source.name,
         }
         await self._log_run(db, "discover", result)
         return result

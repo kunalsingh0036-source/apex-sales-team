@@ -308,6 +308,7 @@ class ProfileCreate(BaseModel):
     code: str
     name: str
     description: str = ""
+    source: str = "apollo"  # name of a registered source adapter
     search_params: dict = {}
     is_active: bool = True
     rotation_priority: int = 100
@@ -316,6 +317,7 @@ class ProfileCreate(BaseModel):
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    source: Optional[str] = None
     search_params: Optional[dict] = None
     is_active: Optional[bool] = None
     rotation_priority: Optional[int] = None
@@ -373,6 +375,7 @@ async def list_profiles(db: AsyncSession = Depends(get_db)):
             "code": p.code,
             "name": p.name,
             "description": p.description,
+            "source": p.source,
             "search_params": p.search_params,
             "is_active": p.is_active,
             "rotation_priority": p.rotation_priority,
@@ -389,11 +392,37 @@ async def list_profiles(db: AsyncSession = Depends(get_db)):
     return {"profiles": out, "total": len(out)}
 
 
+@router.get("/sources")
+async def list_lead_sources():
+    """List every registered lead-source adapter. Powers the source dropdown
+    in the profile editor so the UI can show what discovery backends exist."""
+    from app.services.lead_sources import SOURCES, list_sources
+    out = []
+    for name in list_sources():
+        src = SOURCES[name]
+        out.append({
+            "name": name,
+            "is_passive": getattr(src, "name", None) in ("csv_upload", "website_form"),
+            "description": getattr(src, "description", ""),
+        })
+    return {"sources": out, "total": len(out)}
+
+
 @router.post("/profiles", status_code=201)
 async def create_profile(body: ProfileCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new lead profile. The `code` must be unique."""
+    """Create a new lead profile. The `code` must be unique. The `source`
+    must match a registered adapter (see GET /automation/sources)."""
     if not body.code or not body.name:
         raise HTTPException(status_code=400, detail="code and name are required")
+
+    # Validate source against the live registry — refuse profiles that
+    # would silently fall through to the apollo fallback at dispatch time.
+    from app.services.lead_sources import SOURCES
+    if body.source not in SOURCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown source {body.source!r}. Available: {sorted(SOURCES.keys())}",
+        )
 
     existing = await db.execute(select(LeadProfile).where(LeadProfile.code == body.code))
     if existing.scalar_one_or_none():
@@ -403,6 +432,7 @@ async def create_profile(body: ProfileCreate, db: AsyncSession = Depends(get_db)
         code=body.code,
         name=body.name,
         description=body.description,
+        source=body.source,
         search_params=body.search_params,
         is_active=body.is_active,
         rotation_priority=body.rotation_priority,
@@ -414,6 +444,7 @@ async def create_profile(body: ProfileCreate, db: AsyncSession = Depends(get_db)
         "id": str(p.id),
         "code": p.code,
         "name": p.name,
+        "source": p.source,
         "is_active": p.is_active,
     }
 
@@ -440,6 +471,14 @@ async def update_profile(
         p.name = body.name
     if body.description is not None:
         p.description = body.description
+    if body.source is not None:
+        from app.services.lead_sources import SOURCES
+        if body.source not in SOURCES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown source {body.source!r}. Available: {sorted(SOURCES.keys())}",
+            )
+        p.source = body.source
     if body.search_params is not None:
         p.search_params = body.search_params
     if body.is_active is not None:

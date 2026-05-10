@@ -39,6 +39,10 @@ class LeadProfile(Base, UUIDMixin, TimestampMixin):
     code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Which source adapter this profile dispatches to (see
+    # app.services.lead_sources.SOURCES). Default 'apollo' for backwards
+    # compatibility with all 8 seeded profiles from migration 008.
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="apollo")
     search_params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     rotation_priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
