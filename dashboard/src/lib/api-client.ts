@@ -463,4 +463,18 @@ export const api = {
     delete: (id: string) =>
       request<any>(`/automation/profiles/${id}`, { method: "DELETE" }),
   },
+
+  // Chrome extension token management. The token plaintext is returned
+  // by `create()` exactly once — UI must show it to the user immediately.
+  extension: {
+    listTokens: () =>
+      request<{ tokens: Array<{ id: string; label: string; created_at: string; last_used_at: string | null; revoked_at: string | null }>; total: number }>("/extension/tokens"),
+    createToken: (label: string) =>
+      request<{ id: string; label: string; token: string; created_at: string; warning: string }>(
+        "/extension/tokens",
+        { method: "POST", body: JSON.stringify({ label }) }
+      ),
+    revokeToken: (id: string) =>
+      request<{ status: string; id: string; label: string }>(`/extension/tokens/${id}`, { method: "DELETE" }),
+  },
 };

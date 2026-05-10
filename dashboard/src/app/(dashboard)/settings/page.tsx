@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
+import ExtensionTokens from "@/components/settings/ExtensionTokens";
 import { api } from "@/lib/api-client";
 
 export default function SettingsPage() {
@@ -32,6 +33,11 @@ export default function SettingsPage() {
       <Header title="Settings" />
 
       <div className="space-y-6 max-w-4xl">
+        {/* Chrome extension token management — surfaced first because
+            this is the unblocking tool for sites the server can't reach
+            (schools.org.in / GeM / LinkedIn). */}
+        <ExtensionTokens />
+
         {/* Integration Status */}
         <div className="bg-white rounded-xl p-6 border border-rich-creme">
           <h3 className="font-display text-lg font-bold text-crimson-dark mb-4">
