@@ -416,7 +416,10 @@ export default function LeadsPage() {
         >
           {importResult.success ? (
             <p>
-              Imported {importResult.created} leads.
+              Imported {importResult.created} leads
+              {importResult.batch?.batch_code && (
+                <> as batch <span className="font-mono font-bold">{importResult.batch.batch_code}</span></>
+              )}.
               {importResult.skipped_duplicates > 0 &&
                 ` Skipped ${importResult.skipped_duplicates} duplicates.`}
               {importResult.errors?.length > 0 &&

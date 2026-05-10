@@ -91,6 +91,9 @@ allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://apex-sales-team.vercel.app",
+    # Public Apex website — submits contact-form leads via /leads/inbound-webhook
+    "https://www.theapexhumancompany.com",
+    "https://theapexhumancompany.com",
 ]
 extra_origin = os.getenv("CORS_ORIGIN", "")
 if extra_origin:

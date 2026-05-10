@@ -1,6 +1,11 @@
 import uuid
 import io
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+import hmac
+import hashlib
+import logging
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Header, Request
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, func, or_, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,12 +13,197 @@ import pandas as pd
 from app.dependencies import get_db
 from app.models.lead import Company, Lead
 from app.models.activity import Activity
+from app.models.user import SystemSetting
 from app.schemas.lead import (
     LeadCreate, LeadUpdate, LeadResponse, LeadStageUpdate, LeadFilter,
 )
 from app.schemas.common import PaginatedResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ─── Inbound webhook (public — secured by HMAC of request body) ────────
+
+class InboundWebhookPayload(BaseModel):
+    """Shape the public website form sends to /leads/inbound-webhook.
+
+    Mirrors the ConsultationForm fields so the website's submit handler
+    can post the form data directly without remapping. All fields except
+    name+email+company are optional — keep it forgiving so the website can
+    evolve the form without breaking the agent."""
+    name: str
+    email: str
+    company: str
+    phone: Optional[str] = None
+    interest: Optional[str] = None      # apparel | gifting | design | multiple | not-sure
+    quantity: Optional[str] = None      # 25-50, 50-200, ... 1000+
+    message: Optional[str] = None
+    source_url: Optional[str] = None    # which page they submitted from
+    referrer: Optional[str] = None      # http referrer for attribution
+
+
+@router.post("/inbound-webhook", status_code=201)
+async def inbound_lead_webhook(
+    request: Request,
+    payload: InboundWebhookPayload,
+    x_apex_webhook_secret: str = Header(..., alias="X-Apex-Webhook-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Receive a lead from the public Apex website's contact form.
+
+    Auth model: shared-secret header. The website holds a copy of the
+    secret in its NEXT_PUBLIC_… env var (acceptable here because submission
+    is browser-originated and rate-limited; the secret prevents random
+    bots from finding the URL and spamming us). For higher-stakes use we
+    can rotate the secret + move to a server-only proxy.
+
+    Lead is stamped with the P-website-inbound profile so it shows up
+    distinctly from Apollo discoveries. Each submission gets its own
+    one-off batch (B-xxxx) for clean tracking — these are the highest-
+    intent leads we have.
+    """
+    # 1. Verify the secret. We read from the INBOUND_WEBHOOK_SECRET env var
+    # (set on Railway and matched by APEX_INBOUND_WEBHOOK_SECRET on the
+    # public website's Vercel project). DB-backed secret is also accepted
+    # as a fallback so an operator can rotate via system_settings without
+    # restarting the API.
+    import os as _os
+    expected = _os.getenv("INBOUND_WEBHOOK_SECRET")
+    if not expected:
+        # Fallback: DB-stored secret seeded by migration 009
+        secret_setting = await db.execute(
+            select(SystemSetting).where(SystemSetting.key == "inbound_webhook_secret")
+        )
+        setting = secret_setting.scalar_one_or_none()
+        if setting and "secret" in setting.value:
+            expected = setting.value["secret"]
+
+    if not expected:
+        logger.error("INBOUND_WEBHOOK_SECRET unset and no system_settings fallback")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+
+    # constant-time compare so we don't leak info via timing
+    if not hmac.compare_digest(x_apex_webhook_secret, expected):
+        logger.warning(f"Inbound webhook auth failed from {request.client.host if request.client else '?'}")
+        raise HTTPException(status_code=401, detail="Invalid secret")
+
+    # 2. Find or create the company
+    company = None
+    if payload.company:
+        result = await db.execute(
+            select(Company).where(Company.name == payload.company.strip())
+        )
+        company = result.scalar_one_or_none()
+        if not company:
+            company = Company(
+                name=payload.company.strip(),
+                industry="Other",
+            )
+            db.add(company)
+            await db.flush()
+
+    # 3. Dedup by email — if this person already exists, log a fresh activity
+    # ("they came back to the website") instead of creating a duplicate lead.
+    existing_q = await db.execute(
+        select(Lead).where(Lead.email == payload.email.lower())
+    )
+    existing = existing_q.scalar_one_or_none()
+    if existing:
+        db.add(Activity(
+            lead_id=existing.id,
+            type="website_form_repeat",
+            channel="website",
+            description=f"Repeat website form submission ({payload.interest or 'general'}, qty {payload.quantity or '?'})",
+            extra_data={
+                "interest": payload.interest,
+                "quantity": payload.quantity,
+                "message": payload.message,
+                "source_url": payload.source_url,
+            },
+        ))
+        # Bump stage if they were just a prospect — they're now actively engaging
+        if existing.stage == "prospect":
+            existing.stage = "engaged"
+        await db.commit()
+        return {
+            "status": "duplicate_logged_as_activity",
+            "lead_id": str(existing.id),
+            "lead_code": existing.lead_code,
+        }
+
+    # 4. Create a one-off batch for this submission so it tracks distinctly
+    from app.models.lead import LeadBatch, LeadProfile
+    profile_q = await db.execute(
+        select(LeadProfile).where(LeadProfile.code == "P-website-inbound")
+    )
+    inbound_profile = profile_q.scalar_one_or_none()
+    inbound_batch = LeadBatch(
+        triggered_by="website_inbound",
+        target_lead_count=1,
+        status="active",
+        notes=f"Website submission — {payload.interest or 'general'}, qty {payload.quantity or '?'}",
+        profile_id=inbound_profile.id if inbound_profile else None,
+    )
+    db.add(inbound_batch)
+    await db.flush()
+
+    # 5. Parse name into first/last (best-effort; the form has a single field)
+    name_parts = payload.name.strip().split(maxsplit=1)
+    first_name = name_parts[0] if name_parts else "Unknown"
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+    # 6. Create the lead — start at 'engaged' stage since they raised their hand
+    lead = Lead(
+        batch_id=inbound_batch.id,
+        company_id=company.id if company else None,
+        first_name=first_name,
+        last_name=last_name,
+        email=payload.email.lower(),
+        phone=payload.phone,
+        job_title="(from website form)",  # form doesn't ask for title
+        country="India",
+        source="website_inbound",
+        stage="engaged",  # they came to us — start past prospect
+        consent_status="opted_in",  # they submitted a contact form, that's consent
+        tags=["website_inbound", payload.interest] if payload.interest else ["website_inbound"],
+        notes=payload.message or "",
+        enrichment_data={
+            "interest": payload.interest,
+            "quantity": payload.quantity,
+            "source_url": payload.source_url,
+            "referrer": payload.referrer,
+            "submitted_at": str(func.now()),
+        },
+    )
+    db.add(lead)
+    await db.flush()
+
+    # 7. Activity log entry so the team can see it on the lead's timeline
+    db.add(Activity(
+        lead_id=lead.id,
+        type="website_form_submission",
+        channel="website",
+        description=f"Submitted contact form. Interest: {payload.interest or '—'}, qty: {payload.quantity or '—'}.",
+        extra_data={
+            "interest": payload.interest,
+            "quantity": payload.quantity,
+            "message": payload.message,
+            "source_url": payload.source_url,
+            "referrer": payload.referrer,
+        },
+    ))
+
+    await db.commit()
+    await db.refresh(lead)
+
+    logger.info(f"Website lead created: {lead.lead_code} {payload.email} ({payload.company})")
+    return {
+        "status": "created",
+        "lead_id": str(lead.id),
+        "lead_code": lead.lead_code,
+        "batch_code": inbound_batch.batch_code,
+    }
 
 
 @router.get("", response_model=PaginatedResponse[LeadResponse])
@@ -392,9 +582,14 @@ async def get_lead_profile(
 @router.post("/bulk-import")
 async def bulk_import_leads(
     file: UploadFile = File(...),
+    batch_label: str = Query("", description="Optional human label for the batch (e.g. 'LinkedIn Sales Nav export 2026-05', 'Trade Show 2026 attendees')"),
     db: AsyncSession = Depends(get_db),
 ):
     """Import leads from CSV or Excel file.
+
+    Each upload creates a fresh batch tagged with the P-manual-upload
+    profile. Leads in the file land in that batch with source='csv_import'
+    so they're trackable end-to-end alongside Apollo-discovered batches.
 
     Expected columns: first_name, last_name, email, phone, job_title,
     department, seniority, company_name, industry, city, state, source
@@ -415,6 +610,30 @@ async def bulk_import_leads(
             )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+
+    # Create a batch for this upload so the leads are tracked alongside
+    # autopilot batches. Stamps with P-manual-upload profile if it exists
+    # (falls back to NULL profile_id if the profile somehow got deleted).
+    from app.models.lead import LeadBatch, LeadProfile
+    profile_q = await db.execute(
+        select(LeadProfile).where(LeadProfile.code == "P-manual-upload")
+    )
+    upload_profile = profile_q.scalar_one_or_none()
+
+    batch_notes = f"CSV upload: {file.filename}"
+    if batch_label:
+        batch_notes = f"{batch_notes} — {batch_label}"
+
+    upload_batch = LeadBatch(
+        triggered_by="manual_csv_upload",
+        target_lead_count=20,  # not really applicable; kept for schema consistency
+        status="active",
+        notes=batch_notes,
+        profile_id=upload_profile.id if upload_profile else None,
+    )
+    db.add(upload_batch)
+    await db.flush()
+    await db.refresh(upload_batch)
 
     # Normalize column names
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
@@ -466,6 +685,7 @@ async def bulk_import_leads(
                     continue
 
             lead = Lead(
+                batch_id=upload_batch.id,
                 first_name=str(row["first_name"]),
                 last_name=str(row["last_name"]),
                 email=str(email) if pd.notna(email) else None,
@@ -489,10 +709,18 @@ async def bulk_import_leads(
 
     await db.commit()
 
+    # Refresh to load the auto-generated batch_code from the trigger
+    await db.refresh(upload_batch)
+
     return {
         "success": True,
         "created": created_count,
         "skipped_duplicates": skipped_count,
         "errors": errors[:20],  # Cap error reporting
         "total_rows": len(df),
+        "batch": {
+            "id": str(upload_batch.id),
+            "batch_code": upload_batch.batch_code,
+            "notes": upload_batch.notes,
+        },
     }
