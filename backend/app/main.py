@@ -145,8 +145,12 @@ app.include_router(api_router, prefix="/api/v1")
 
 
 @app.get("/health")
+@app.get("/healthz")  # substrate convention (matches ~/Claude Code/_template/ARCHITECTURE.md)
 async def health_check():
-    """Health check with dependency status."""
+    """
+    Health check with dependency status (database + redis).
+    Aliased at /health (legacy callers) and /healthz (substrate convention).
+    """
     checks = {"service": "apex-sales-agent"}
 
     # DB check

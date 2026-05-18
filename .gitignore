@@ -46,3 +46,8 @@ Thumbs.db
 *.key
 token.json
 credentials.json
+.vercel
+
+# Office overview docs (kept locally, not source)
+*.docx
+*.pdf
